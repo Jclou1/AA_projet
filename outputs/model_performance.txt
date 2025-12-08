@@ -70,3 +70,19 @@ Performance du modèle Régression Linéaire
 RMSE: 3.2558 secondes
 MAE: 2.5726 secondes
 --------------------------------------------------
+Performance du modèle Random Forest Regressor
+RMSE: 0.7946 secondes
+MAE: 0.6239 secondes
+
+Performance du modèle Régression Linéaire
+RMSE: 5.9125 secondes
+MAE: 4.9428 secondes
+--------------------------------------------------
+Performance du modèle Random Forest Regressor
+RMSE: 0.7946 secondes
+MAE: 0.6239 secondes
+
+Performance du modèle Régression Linéaire
+RMSE: 5.9125 secondes
+MAE: 4.9428 secondes
+--------------------------------------------------

@@ -11,14 +11,17 @@ def main():
     # Bahrain est très abrasif (bon pour voir l'usure)
     races_config = [
         (2024, 'Bahrain'),
-        (2023, 'Bahrain'),
-        (2022, 'Bahrain'),
         (2024, 'Saudi Arabia'),
-        (2023, 'Saudi Arabia'),
-        (2022, 'Saudi Arabia'),
-        (2024, 'Australia'),
-        (2023, 'Australia'),
-        (2022, 'Italy')
+        # (2024, 'Australia'),
+        # (2024, 'Italy'),
+        # (2024, 'Singapore'),
+        # (2024, 'Japan'),
+        # (2024, 'USA'),
+        # (2024, 'Mexico'),
+        # (2024, 'Brazil'),
+        # (2024, 'Abu Dhabi'),
+        # (2024, 'Monaco'),
+        # (2024, 'Canada'),
     ]
 
     # Chargement des données

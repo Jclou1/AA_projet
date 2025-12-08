@@ -81,7 +81,7 @@ def plot_degradation_curve(model, circuit_id, track_temp=35, title="Courbe de D�
     # Ainsi, le modèle ne voit pas la voiture s'alléger par la diminution du carburant.
     fixed_fuel_lap = 25
 
-    compounds = {'Soft': 0, 'Hard': 2}
+    compounds = {'Soft': 0, 'Medium': 1, 'Hard': 2}
     colors = {'Soft': 'red', 'Medium': 'yellow',
               'Hard': 'black'}  # Couleurs F1 standards
 
