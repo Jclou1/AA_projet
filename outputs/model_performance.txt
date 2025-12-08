@@ -1,0 +1,72 @@
+Performance du modèle Random Forest Regressor
+RMSE: 0.7345 secondes
+MAE: 0.6047 secondes
+
+Performance du modèle Régression Linéaire
+RMSE: 0.6575 secondes
+MAE: 0.5706 secondes
+--------------------------------------------------
+Performance du modèle Random Forest Regressor
+RMSE: 0.7345 secondes
+MAE: 0.6047 secondes
+
+Performance du modèle Régression Linéaire
+RMSE: 0.6575 secondes
+MAE: 0.5706 secondes
+--------------------------------------------------
+Performance du modèle Random Forest Regressor
+RMSE: 0.7345 secondes
+MAE: 0.6047 secondes
+
+Performance du modèle Régression Linéaire
+RMSE: 0.6575 secondes
+MAE: 0.5706 secondes
+--------------------------------------------------
+Performance du modèle Random Forest Regressor
+RMSE: 0.7345 secondes
+MAE: 0.6047 secondes
+
+Performance du modèle Régression Linéaire
+RMSE: 0.6575 secondes
+MAE: 0.5706 secondes
+--------------------------------------------------
+Performance du modèle Random Forest Regressor
+RMSE: 0.7345 secondes
+MAE: 0.6047 secondes
+
+Performance du modèle Régression Linéaire
+RMSE: 0.6575 secondes
+MAE: 0.5706 secondes
+--------------------------------------------------
+Performance du modèle Random Forest Regressor
+RMSE: 0.8093 secondes
+MAE: 0.6213 secondes
+
+Performance du modèle Régression Linéaire
+RMSE: 2.9080 secondes
+MAE: 2.2465 secondes
+--------------------------------------------------
+Performance du modèle Random Forest Regressor
+RMSE: 0.8093 secondes
+MAE: 0.6213 secondes
+
+Performance du modèle Régression Linéaire
+RMSE: 2.9080 secondes
+MAE: 2.2465 secondes
+--------------------------------------------------
+Performance du modèle Random Forest Regressor
+RMSE: 0.8093 secondes
+MAE: 0.6213 secondes
+
+Performance du modèle Régression Linéaire
+RMSE: 2.9080 secondes
+MAE: 2.2465 secondes
+--------------------------------------------------
+Performance du modèle Random Forest Regressor
+RMSE: 0.8143 secondes
+MAE: 0.6365 secondes
+
+Performance du modèle Régression Linéaire
+RMSE: 3.2558 secondes
+MAE: 2.5726 secondes
+--------------------------------------------------
