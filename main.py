@@ -2,7 +2,7 @@ from src.data_loader import load_multiple_races, build_races_config_for_circuit
 from src.features import prepare_data, split_data
 from src.models import train_models, evaluate_models, feature_importance
 from src.visualization import plot_predictions, plot_degradation_curve, plot_tyre_degradation_by_circuit, plot_mean_laptime_vs_tyre_life_by_temp, analyze_degradation_by_stint, analyze_degradation_by_stint_and_compound
-from src.strat import simulate_strategy
+from src.strat import generate_strategies, simulate_strategy
 import matplotlib.pyplot as plt
 def main():
     print("F1 Tire Degradation Predictor")
@@ -75,25 +75,25 @@ def main():
 
     print("\n--- Simulation des stratégies de pit stop ---")
 
-    strategies = {
-        "1 stop (Soft → Hard)": [("SOFT", 25), ("HARD", 32)],
-        "2 stops (Soft → Medium → Hard)": [("SOFT", 18), ("MEDIUM", 20), ("HARD", 19)],
-        "2 stops agressif": [("SOFT", 15), ("SOFT", 18), ("HARD", 24)],
-        "3 stops": [("SOFT", 12), ("MEDIUM", 15), ("SOFT", 15), ("HARD", 15)]
-    }
+    strategies = generate_strategies(total_laps=57)
 
-    bahrain_id = le_circuit.transform(["Bahrain"])[0]
+    circuit_name = "Bahrain"
+    circuit_id = le_circuit.transform([circuit_name])[0]
 
     results = {}
+
+    total_laps=57
+    track_temp=35
+    pit_time=22
 
     for name, strat in strategies.items():
         time_total = simulate_strategy(
             rf_model,
             strat,
-            total_laps=57,
-            circuit_id=bahrain_id,
-            track_temp=35,
-            pit_time=22
+            total_laps,
+            circuit_id,
+            track_temp,
+            pit_time
         )
         results[name] = time_total
         print(f"{name} : {time_total/60:.2f} minutes")
@@ -104,14 +104,44 @@ def main():
     names = list(results.keys())
     times = [results[n] / 60 for n in names]
 
-    plt.figure(figsize=(9, 5))
-    plt.bar(names, times)
-    plt.ylabel("Temps total de course (minutes)")
-    plt.title("Comparaison des stratégies de pneus – Simulation ML")
-    plt.xticks(rotation=25)
-    plt.tight_layout()
-    plt.savefig("outputs/strategies_comparees.png")
+    sorted_results = sorted(results.items(), key=lambda x: x[1])
 
+    # On garde seulement le Top 10
+    top10 = sorted_results[:10]
+    best_time = top10[0][1]  # temps total de la meilleure stratégie (en secondes)
+
+    names = [name for name, t in top10]
+    perc_slower = [((t - best_time) / best_time) * 100 for name, t in top10]
+    
+    plt.figure(figsize=(11, 6))
+
+    bars = plt.bar(range(len(names)), perc_slower)
+
+    plt.xticks(range(len(names)), names, rotation=25, ha="right")
+    plt.ylabel("Écart par rapport à la meilleure stratégie (%)")
+
+    title_main = "Top 10 des stratégies de pneus – Écart relatif (Simulation ML)"
+    title_details = (
+        f"Circuit : {circuit_name} | "
+        f"Tours : {total_laps} | "
+        f"Température piste : {track_temp}°C | "
+        f"Temps de pit : {pit_time}s"
+    )
+
+    plt.title(title_main, fontsize=13)
+    plt.suptitle(title_details, fontsize=10, y=0.94)
+
+    # Meilleure stratégie en vert
+    bars[0].set_color("green")
+
+    # Valeurs au-dessus de chaque barre
+    for i, val in enumerate(perc_slower):
+        plt.text(i, val + 0.01, f"{val:.2f}%", ha="center", fontsize=9)
+
+    plt.grid(axis="y", alpha=0.3)
+    plt.tight_layout()
+    plt.savefig("outputs/strategies_top10_percent_annotated_full.png")
+    print("Graphique Top 10 avec métadonnées complètes sauvegardé : outputs/strategies_top10_percent_annotated_full.png")
 
     # Visualisation
     print("\n Génération des graphiques")
