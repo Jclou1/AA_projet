@@ -463,7 +463,7 @@ COMPOUND_COLORS = {
     "HARD": "black",
 }
 
-def plot_raw_vs_model_degradation(
+def plot_degradation_panels(
     df,
     model,
     feature_template,
@@ -471,65 +471,103 @@ def plot_raw_vs_model_degradation(
     le_circuit,
     circuit_name,
     track_temp=35,
-    lap_number=25,
-    save_path="outputs/raw_vs_model_degradation.png",
+    lap_number=14,
+    max_tyre_life=None,
+    save_path="outputs/degradation_panels.png",
 ):
     """
-    Affiche les données brutes (points) + la courbe du modèle par-dessus.
-    - df : dataframe complet (lap data)
-    - model : modèle ML (RandomForest idéalement)
-    - feature_template : X_train.mean() (Series)
-    - feature_names : X_train.columns
-    - le_circuit : LabelEncoder des circuits
-    - circuit_name : nom du circuit (ex: 'Australian')
-    - track_temp : température fixée pour la courbe du modèle
-    - lap_number : tour "référence" pour la charge carburant
+    3 sous-graphes (SOFT/MEDIUM/HARD) :
+      - nuage de points gris = données brutes
+      - ligne pleine = moyenne des données par TyreLife
+      - ligne pointillée = modèle ML
+
+    C'est beaucoup plus lisible que tout empilé dans un seul graphe.
     """
 
-    # On filtre sur le circuit voulu
-    df_circ = df[df["Circuit"] == circuit_name].copy()
-    if df_circ.empty:
-        print(f"Aucune donnée pour le circuit '{circuit_name}'")
+    lap_col = "LapTime_Sec"
+
+    # 1) Filtrer sur le circuit
+    if "Circuit" not in df.columns:
+        print("❌ Colonne 'Circuit' absente.")
+        print("Colonnes :", list(df.columns))
         return
 
-    # Optionnel : filtrage doux sur la température
-    if "TrackTemp" in df_circ.columns:
-        df_circ = df_circ[np.isfinite(df_circ["TrackTemp"])]
+    df_circ = df[df["Circuit"] == circuit_name].copy()
+    if df_circ.empty:
+        print(f"❌ Aucune donnée pour le circuit '{circuit_name}'")
+        return
 
-    # Circuit encodé pour le modèle
+    # Convertir en secondes si besoin
+    lap_series = df_circ[lap_col]
+    if np.issubdtype(lap_series.dtype, np.dtype("timedelta64[ns]")):
+        df_circ["_LapTime_sec"] = lap_series.dt.total_seconds()
+    else:
+        df_circ["_LapTime_sec"] = lap_series.astype(float)
+
+    # Encodage du circuit
     circuit_id = le_circuit.transform([circuit_name])[0]
-
-    plt.figure(figsize=(10, 6))
 
     compounds = ["SOFT", "MEDIUM", "HARD"]
 
-    for comp in compounds:
-        df_comp = df_circ[df_circ["Compound"] == comp]
+    fig, axes = plt.subplots(1, 3, figsize=(15, 4.5), sharey=True)
+    axes = np.atleast_1d(axes)
+
+    for ax, comp in zip(axes, compounds):
+        if "Compound" not in df_circ.columns or "TyreLife" not in df_circ.columns:
+            print("❌ Colonnes 'Compound' ou 'TyreLife' manquantes.")
+            return
+
+        df_comp = df_circ[df_circ["Compound"] == comp].copy()
         if df_comp.empty:
+            ax.set_title(f"{comp} (aucune donnée)")
             continue
 
-        # --- 1) Points bruts ---
-        plt.scatter(
+        if max_tyre_life is not None:
+            df_comp = df_comp[df_comp["TyreLife"] <= max_tyre_life]
+
+        # Nuage de points brut (gris)
+        ax.scatter(
             df_comp["TyreLife"],
-            df_comp["LapTime_Sec"],
-            alpha=0.3,
-            label=f"{comp} (data)",
-            s=12,
+            df_comp["_LapTime_sec"],
+            alpha=0.15,
+            s=8,
+            color="grey",
+            label="Données brutes" if comp == "SOFT" else None,
+        )
+
+        # Moyenne + écart-type par TyreLife
+        stats = (
+            df_comp.groupby("TyreLife")["_LapTime_sec"]
+            .agg(["mean", "std", "count"])
+            .reset_index()
+        )
+        ages = stats["TyreLife"].values
+        mean_data = stats["mean"].values
+        std_data = stats["std"].values
+
+        ax.plot(
+            ages,
+            mean_data,
+            linewidth=2,
+            color=COMPOUND_COLORS.get(comp, None),
+            label="Moyenne données" if comp == "SOFT" else None,
+        )
+        ax.fill_between(
+            ages,
+            mean_data - std_data,
+            mean_data + std_data,
+            alpha=0.15,
             color=COMPOUND_COLORS.get(comp, None),
         )
 
-        # --- 2) Courbe du modèle ---
-        ages = np.arange(1, df_comp["TyreLife"].max() + 1)
-
+        # Courbe du modèle pour les mêmes ages
         preds = []
+        mapping = {"SOFT": 0, "MEDIUM": 1, "HARD": 2}
         for age in ages:
             row = feature_template.copy()
-
             if "TyreLife" in row.index:
                 row["TyreLife"] = age
             if "Compound_Encoded" in row.index:
-                # même mapping que dans ton strat.py
-                mapping = {"SOFT": 0, "MEDIUM": 1, "HARD": 2}
                 row["Compound_Encoded"] = mapping[comp]
             if "LapNumber" in row.index:
                 row["LapNumber"] = lap_number
@@ -541,22 +579,31 @@ def plot_raw_vs_model_degradation(
             X_row = pd.DataFrame([row])[list(feature_names)]
             preds.append(model.predict(X_row)[0])
 
-        plt.plot(
+        ax.plot(
             ages,
             preds,
+            linestyle="--",
             linewidth=2,
             color=COMPOUND_COLORS.get(comp, None),
-            label=f"{comp} (modèle)",
+            label="Modèle" if comp == "SOFT" else None,
         )
 
-    plt.xlabel("Âge du pneu (TyreLife, tours)")
-    plt.ylabel("Temps au tour (s)")
-    plt.title(
-        f"Dégradation des pneus – données brutes vs modèle\n"
-        f"Circuit : {circuit_name} | Temp piste : {track_temp}°C | Lap ref : {lap_number}"
+        ax.set_title(comp)
+        ax.set_xlabel("TyreLife (tours)")
+
+    axes[0].set_ylabel("Temps au tour (s)")
+
+    # Légende commune
+    handles, labels = axes[0].get_legend_handles_labels()
+    if handles:
+        fig.legend(handles, labels, loc="upper center", ncol=3)
+
+    fig.suptitle(
+        f"Dégradation des pneus – {circuit_name}\n"
+        f"Temp piste : {track_temp}°C | Lap ref : {lap_number}",
+        y=1.03,
+        fontsize=12,
     )
-    plt.legend()
-    plt.grid(alpha=0.3)
     plt.tight_layout()
-    plt.savefig(save_path)
-    print(f"Graphique raw vs modèle sauvegardé : {save_path}")
+    plt.savefig(save_path, bbox_inches="tight")
+    print(f"Graphique panneaux sauvegardé : {save_path}")

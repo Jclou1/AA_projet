@@ -1,7 +1,7 @@
 from src.data_loader import load_multiple_races, build_races_config_for_circuit
 from src.features import prepare_data, split_data
 from src.models import train_models, evaluate_models, feature_importance, train_all_models, evaluate_all_models
-from src.visualization import plot_model_performance, plot_raw_vs_model_degradation
+from src.visualization import plot_model_performance, plot_degradation_panels 
 from src.strat import generate_strategies, simulate_strategy
 import matplotlib.pyplot as plt
 def main():
@@ -25,8 +25,8 @@ def main():
 #    ]
 
     circuit_name = "Australian"
-    total_laps=14
-    track_temp=15
+    total_laps=44
+    track_temp=30
     pit_time=22
 
     races_config = build_races_config_for_circuit(
@@ -70,10 +70,8 @@ def main():
     print("\nEntraînement du modèle")
     rf_model, linear_model = train_models(X_train, y_train)
 
-        # Importance des features (Random Forest)
-    feature_names = X.columns.tolist()
-    feature_importance(rf_model, feature_names)
-
+    feature_template = X_train.mean(numeric_only=True)
+    feature_names = X_train.columns
     # Évaluation
     #print("\n Évaluation")
     #rf_preds, rf_rmse, rf_mae, lin_preds, lin_rmse, lin_mae = evaluate_models(
@@ -101,17 +99,18 @@ def main():
     # Si tu veux, tu peux récupérer le meilleur modèle pour la suite :
     best_model = models[best_name]
 
-    plot_raw_vs_model_degradation(
-        df,
-        best_model,              # ou best_model si tu veux
-        feature_template,
-        feature_names,
-        le_circuit,
-        circuit_name,
-        track_temp,
-        total_laps,          # par ex. milieu de ton relais de 14 tours
-        save_path="outputs/raw_vs_model_degradation.png",
-    )
+    plot_degradation_panels(
+    df,
+    rf_model,           # ou best_model si tu veux
+    feature_template,
+    feature_names,
+    le_circuit,
+    circuit_name,
+    track_temp,
+    total_laps,      # cohérent avec ta simu
+    max_tyre_life=30,   # optionnel : limite l’axe en X
+    save_path="outputs/degradation_panels.png",
+)
 
 
     print("\n--- Simulation des stratégies de pit stop ---")
