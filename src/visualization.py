@@ -116,3 +116,311 @@ def plot_degradation_curve(model, circuit_id, track_temp=35, title="Courbe de D�
     plt.savefig(f"outputs/courbe_degradation_{rand}.png")
     print(
         f"Nouvelle courbe générée : outputs/courbe_degradation_{rand}.png")
+    
+def plot_tyre_degradation_by_circuit(df, circuit_name, title=None):
+    """
+    Visualise la dégradation des pneus sur un circuit donné,
+    en comparant plusieurs années / courses.
+
+    Paramètres:
+      - df : DataFrame global (celui venant de load_multiple_races)
+              doit contenir au moins :
+                ['Circuit', 'Year', 'TyreLife', 'LapTime_Sec', 'TrackTemp']
+      - circuit_name : nom du circuit tel que stocké dans df['Circuit']
+                       (ex: 'Bahrain', 'Saudi Arabia', etc.)
+    """
+
+    # Filtre sur le circuit demandé
+    data = df[df['Circuit'] == circuit_name].copy()
+
+    if data.empty:
+        print(f"Aucune donnée trouvée pour le circuit '{circuit_name}'")
+        return
+
+    # Si pas de titre fourni, on en met un par défaut
+    if title is None:
+        title = f"Dégradation des pneus sur {circuit_name} (comparaison par année)"
+
+    years = sorted(data['Year'].unique())
+
+    plt.figure(figsize=(10, 6))
+
+    # On boucle sur chaque année pour les distinguer par marqueur/couleur
+    markers = ['o', 's', '^', 'D', 'x', 'P', 'v', '*']
+    import itertools
+    marker_cycle = itertools.cycle(markers)
+
+    # On va aussi colorier par TrackTemp
+    # On garde la même échelle de couleur pour tout le circuit
+    temps = data['TrackTemp']
+    vmin = temps.min()
+    vmax = temps.max()
+
+    for year in years:
+        sub = data[data['Year'] == year]
+
+        marker = next(marker_cycle)
+
+        sc = plt.scatter(
+            sub['TyreLife'],
+            sub['LapTime_Sec'],
+            c=sub['TrackTemp'],
+            vmin=vmin,
+            vmax=vmax,
+            alpha=0.6,
+            marker=marker,
+            label=str(year)
+        )
+
+    cbar = plt.colorbar(sc)
+    cbar.set_label("Température piste (°C)")
+
+    plt.xlabel("Usure du pneu (TyreLife, en tours)")
+    plt.ylabel("Temps au tour (sec)")
+    plt.title(title)
+    plt.grid(True, alpha=0.3)
+    plt.legend(title="Année", loc="best")
+
+    plt.tight_layout()
+
+    import numpy as np
+    rand = np.random.randint(0, 10000)
+    filename = f"outputs/tyre_deg_{circuit_name.lower()}_{rand}.png"
+    plt.savefig(filename)
+    print(f"Graphe dégradation par circuit sauvegardé dans '{filename}'")
+
+
+def plot_mean_laptime_vs_tyre_life_by_temp(df, circuit_name=None):
+    """
+    Tendance de l'usure pour différentes plages de température de piste.
+    """
+
+    data = df.copy()
+    if circuit_name is not None:
+        data = data[data["Circuit"] == circuit_name]
+
+    data["TempBin"] = pd.cut(
+        data["TrackTemp"],
+        bins=[0, 25, 35, 50],
+        labels=["Froid", "Modéré", "Chaud"]
+    )
+
+    data["TyreLifeBin"] = data["TyreLife"].astype(int)
+
+    plt.figure(figsize=(10, 6))
+
+    for label in data["TempBin"].dropna().unique():
+        sub = data[data["TempBin"] == label]
+        grouped = sub.groupby("TyreLifeBin")["LapTime_Sec"].mean()
+        plt.plot(grouped.index, grouped.values, marker='o', label=str(label))
+
+    plt.xlabel("Usure du pneu (TyreLife)")
+    plt.ylabel("Temps moyen au tour (sec)")
+    
+    if circuit_name:
+        plt.title(f"Dégradation des pneus selon la température – {circuit_name}")
+    else:
+        plt.title("Dégradation des pneus selon la température")
+
+    plt.legend(title="Température piste")
+    plt.grid(True, alpha=0.3)
+
+    import numpy as np
+    rand = np.random.randint(0, 10000)
+    filename = f"outputs/tendance_usure_temp_{rand}.png"
+    plt.tight_layout()
+    plt.savefig(filename)
+
+    print(f"Graphe tendance usure par température sauvegardé : {filename}")
+
+def analyze_degradation_by_stint(df, circuit_name=None):
+    """
+    Analyse la dégradation des pneus à l'intérieur de chaque relais (Stint).
+    Calcule la pente (sec/tour) de la dégradation pour chaque relais valide
+    et génère un graphique sur quelques relais représentatifs.
+    """
+
+    data = df.copy()
+
+    if circuit_name is not None:
+        data = data[data["Circuit"] == circuit_name]
+
+    # On garde seulement les relais exploitables
+    data = data.dropna(subset=["Stint", "TyreLife", "LapTime_Sec"])
+
+    import numpy as np
+    import matplotlib.pyplot as plt
+
+    slopes = []
+    valid_stints = []
+
+    for stint_id in sorted(data["Stint"].unique()):
+        sub = data[data["Stint"] == stint_id]
+
+        # Il faut suffisamment de points pour estimer une pente fiable
+        if len(sub) >= 6:
+            x = sub["TyreLife"].values
+            y = sub["LapTime_Sec"].values
+
+            # Régression linéaire sur le relais : y = a*x + b
+            a, b = np.polyfit(x, y, 1)
+            slopes.append(a)
+            valid_stints.append(stint_id)
+
+    if len(slopes) == 0:
+        print("Aucun relais valide pour l'analyse.")
+        return
+
+    slopes = np.array(slopes)
+
+    # --- Statistiques globales ---
+    print("\n--- Analyse de la dégradation par relais ---")
+    print(f"Nombre de relais analysés : {len(slopes)}")
+    print(f"Pente moyenne de dégradation : {slopes.mean():.4f} sec / tour")
+    print(f"Pente minimale : {slopes.min():.4f} sec / tour")
+    print(f"Pente maximale : {slopes.max():.4f} sec / tour")
+    print(f"Écart-type : {slopes.std():.4f} sec / tour")
+
+    # --- Graphique de quelques relais représentatifs ---
+    plt.figure(figsize=(10, 6))
+
+    # On affiche 5 relais bien répartis
+    sample_stints = valid_stints[::max(1, len(valid_stints)//5)][:5]
+
+    for stint_id in sample_stints:
+        sub = data[data["Stint"] == stint_id]
+
+        x = sub["TyreLife"].values
+        y = sub["LapTime_Sec"].values
+
+        a, b = np.polyfit(x, y, 1)
+        y_fit = a * x + b
+
+        plt.plot(x, y, 'o', alpha=0.4)
+        plt.plot(x, y_fit, label=f"Stint {stint_id} (pente={a:.3f})")
+
+    plt.xlabel("Usure du pneu (TyreLife)")
+    plt.ylabel("Temps au tour (sec)")
+    
+    if circuit_name:
+        plt.title(f"Dégradation des pneus par relais – {circuit_name}")
+    else:
+        plt.title("Dégradation des pneus par relais")
+
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+
+    rand = np.random.randint(0, 10000)
+    filename = f"outputs/degradation_par_relais_{rand}.png"
+    plt.tight_layout()
+    plt.savefig(filename)
+
+    print(f"Graphe par relais sauvegardé dans : {filename}")
+
+    return slopes
+
+
+def analyze_degradation_by_stint_and_compound(df, circuit_name=None):
+    """
+    Calcule la pente de dégradation (sec/tour) par relais,
+    séparée par type de pneu (Soft / Medium / Hard),
+    et génère des graphiques comparatifs.
+    """
+
+    import numpy as np
+    import matplotlib.pyplot as plt
+    import pandas as pd
+
+    data = df.copy()
+
+    if circuit_name is not None:
+        data = data[data["Circuit"] == circuit_name]
+
+    data = data.dropna(subset=["Stint", "TyreLife", "LapTime_Sec", "Compound"])
+
+    results = {
+        "SOFT": [],
+        "MEDIUM": [],
+        "HARD": []
+    }
+
+    # --- Calcul des pentes par relais ---
+    for stint_id in sorted(data["Stint"].unique()):
+        sub = data[data["Stint"] == stint_id]
+
+        if len(sub) >= 6:  # assez de points
+            x = sub["TyreLife"].values
+            y = sub["LapTime_Sec"].values
+            a, b = np.polyfit(x, y, 1)
+
+            compound = sub["Compound"].iloc[0]
+            if compound in results:
+                results[compound].append(a)
+
+    # --- Statistiques ---
+    print("\n--- Analyse de la dégradation par relais et par type de pneu ---")
+    for comp, slopes in results.items():
+        if len(slopes) > 0:
+            slopes = np.array(slopes)
+            print(f"\n{comp}")
+            print(f"  Nombre de relais : {len(slopes)}")
+            print(f"  Pente moyenne    : {slopes.mean():.4f} sec/tour")
+            print(f"  Pente min        : {slopes.min():.4f}")
+            print(f"  Pente max        : {slopes.max():.4f}")
+            print(f"  Écart-type       : {slopes.std():.4f}")
+            results[comp] = slopes
+        else:
+            print(f"\n{comp} : aucun relais valide")
+
+    # --- BOXPLOT COMPARATIF ---
+    plt.figure(figsize=(9, 6))
+
+    data_to_plot = []
+    labels = []
+
+    for comp in ["SOFT", "MEDIUM", "HARD"]:
+        if len(results[comp]) > 0:
+            data_to_plot.append(results[comp])
+            labels.append(comp)
+
+    plt.boxplot(data_to_plot, labels=labels, showfliers=True)
+    plt.ylabel("Pente de dégradation (sec / tour)")
+    if circuit_name:
+        plt.title(f"Comparaison de la dégradation par type de pneu – {circuit_name}")
+    else:
+        plt.title("Comparaison de la dégradation par type de pneu")
+
+    plt.grid(True, alpha=0.3)
+
+    import numpy as np
+    rand = np.random.randint(0, 10000)
+    filename1 = f"outputs/pentes_par_compose_{rand}.png"
+    plt.tight_layout()
+    plt.savefig(filename1)
+
+    print(f"Boxplot sauvegardé : {filename1}")
+
+    # --- HISTOGRAMMES ---
+    plt.figure(figsize=(10, 6))
+
+    for comp in ["SOFT", "MEDIUM", "HARD"]:
+        if len(results[comp]) > 0:
+            plt.hist(results[comp], bins=12, alpha=0.6, label=comp)
+
+    plt.xlabel("Pente de dégradation (sec / tour)")
+    plt.ylabel("Nombre de relais")
+    if circuit_name:
+        plt.title(f"Distribution des pentes par type de pneu – {circuit_name}")
+    else:
+        plt.title("Distribution des pentes par type de pneu")
+
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+
+    filename2 = f"outputs/histogramme_pentes_{rand}.png"
+    plt.tight_layout()
+    plt.savefig(filename2)
+
+    print(f"Histogramme sauvegardé : {filename2}")
+
+    return results

@@ -38,3 +38,8 @@ def evaluate_models(rf_model, linear_model, X_test, y_test):
     print(f"Random Forest (Avancé)     : {rf_rmse:.4f} sec")
 
     return rf_preds, rf_rmse, rf_mae, lin_preds, lin_rmse, lin_mae
+
+def feature_importance(model, feature_names):
+    importances = model.feature_importances_
+    for name, val in zip(feature_names, importances):
+        print(f"{name} : {val:.3f}")

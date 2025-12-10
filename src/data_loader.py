@@ -47,7 +47,7 @@ def load_race_data(year, gp_identifier, session_type='R'):
 
     # Extraction des tours (Laps)
     laps = session.laps
-
+    
     # Filtrage Initial (Crucial pour le ML)
     # On ne veut que les tours représentatifs de la performance réelle des pneus.
 
@@ -96,7 +96,10 @@ def load_race_data(year, gp_identifier, session_type='R'):
         'Team',
         'TrackTemp',
         'AirTemp',
-        'Rainfall'
+        'Rainfall',
+        'Position',
+        'SpeedST',
+        'Stint'
     ]
 
     # Vérification que toutes les colonnes existent avant de filtrer
@@ -139,6 +142,39 @@ def load_multiple_races(races_config):
     return pd.concat(all_data, ignore_index=True)
 
 
+def build_races_config_for_circuit(circuit_keyword, start_year=2010, end_year=2025):
+    """
+    Construit automatiquement la liste races_config pour un circuit donné
+    à partir du calendrier FastF1.
+
+    Exemple:
+        races_config = build_races_config_for_circuit("Bahrain", 2015, 2024)
+    """
+    fastf1.Cache.enable_cache(".fastf1_cache")
+
+    races_config = []
+
+    for year in range(start_year, end_year + 1):
+        try:
+            schedule = fastf1.get_event_schedule(year)
+        except Exception as e:
+            print(f"Calendrier indisponible pour {year} : {e}")
+            continue
+
+        for _, row in schedule.iterrows():
+
+            event_name = str(row.get("EventName", ""))
+            event_format = str(row.get("EventFormat", ""))
+
+            # On cherche le circuit par mot-clé
+            if circuit_keyword.lower() in event_name.lower():
+                races_config.append((year, row["EventName"].split(" Grand")[0]))
+
+                print(f"Ajout : {year} - {row['EventName']}")
+                break  # 1 seul GP par année
+
+    return races_config
+
 # ---------------------------------------------------------
 # Bloc de test (s'exécute seulement si on lance le fichier directement)
 if __name__ == "__main__":
@@ -150,3 +186,4 @@ if __name__ == "__main__":
     print(df.head())
     print("\n--- Infos ---")
     print(df.info())
+
