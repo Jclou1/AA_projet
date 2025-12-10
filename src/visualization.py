@@ -424,3 +424,139 @@ def analyze_degradation_by_stint_and_compound(df, circuit_name=None):
     print(f"Histogramme sauvegardé : {filename2}")
 
     return results
+
+def plot_model_performance(results, save_path="outputs/model_performance_models.png"):
+    """
+    Affiche un graphique comparant la RMSE de chaque modèle.
+
+    results : dict {nom_modèle: {"rmse": ..., "mae": ..., "preds": ...}}
+               (ce que retourne evaluate_all_models)
+    """
+    model_names = list(results.keys())
+    rmses = [results[m]["rmse"] for m in model_names]
+
+    # On trouve le meilleur modèle pour le mettre en avant
+    best_idx = min(range(len(model_names)), key=lambda i: rmses[i])
+
+    plt.figure(figsize=(8, 5))
+    bars = plt.bar(range(len(model_names)), rmses)
+
+    # Met le meilleur modèle en vert
+    bars[best_idx].set_color("green")
+
+    plt.xticks(range(len(model_names)), model_names, rotation=20, ha="right")
+    plt.ylabel("RMSE (s)")
+    plt.title("Comparaison des modèles – RMSE sur l'ensemble de test")
+
+    # Affiche la valeur numérique au-dessus de chaque barre
+    for i, val in enumerate(rmses):
+        plt.text(i, val + 0.03, f"{val:.2f}", ha="center", fontsize=9)
+
+    plt.grid(axis="y", alpha=0.3)
+    plt.tight_layout()
+    plt.savefig(save_path)
+    print(f"Graphique de performance des modèles sauvegardé : {save_path}")
+
+COMPOUND_COLORS = {
+    "SOFT": "red",
+    "MEDIUM": "gold",
+    "HARD": "black",
+}
+
+def plot_raw_vs_model_degradation(
+    df,
+    model,
+    feature_template,
+    feature_names,
+    le_circuit,
+    circuit_name,
+    track_temp=35,
+    lap_number=25,
+    save_path="outputs/raw_vs_model_degradation.png",
+):
+    """
+    Affiche les données brutes (points) + la courbe du modèle par-dessus.
+    - df : dataframe complet (lap data)
+    - model : modèle ML (RandomForest idéalement)
+    - feature_template : X_train.mean() (Series)
+    - feature_names : X_train.columns
+    - le_circuit : LabelEncoder des circuits
+    - circuit_name : nom du circuit (ex: 'Australian')
+    - track_temp : température fixée pour la courbe du modèle
+    - lap_number : tour "référence" pour la charge carburant
+    """
+
+    # On filtre sur le circuit voulu
+    df_circ = df[df["Circuit"] == circuit_name].copy()
+    if df_circ.empty:
+        print(f"Aucune donnée pour le circuit '{circuit_name}'")
+        return
+
+    # Optionnel : filtrage doux sur la température
+    if "TrackTemp" in df_circ.columns:
+        df_circ = df_circ[np.isfinite(df_circ["TrackTemp"])]
+
+    # Circuit encodé pour le modèle
+    circuit_id = le_circuit.transform([circuit_name])[0]
+
+    plt.figure(figsize=(10, 6))
+
+    compounds = ["SOFT", "MEDIUM", "HARD"]
+
+    for comp in compounds:
+        df_comp = df_circ[df_circ["Compound"] == comp]
+        if df_comp.empty:
+            continue
+
+        # --- 1) Points bruts ---
+        plt.scatter(
+            df_comp["TyreLife"],
+            df_comp["LapTime_Sec"],
+            alpha=0.3,
+            label=f"{comp} (data)",
+            s=12,
+            color=COMPOUND_COLORS.get(comp, None),
+        )
+
+        # --- 2) Courbe du modèle ---
+        ages = np.arange(1, df_comp["TyreLife"].max() + 1)
+
+        preds = []
+        for age in ages:
+            row = feature_template.copy()
+
+            if "TyreLife" in row.index:
+                row["TyreLife"] = age
+            if "Compound_Encoded" in row.index:
+                # même mapping que dans ton strat.py
+                mapping = {"SOFT": 0, "MEDIUM": 1, "HARD": 2}
+                row["Compound_Encoded"] = mapping[comp]
+            if "LapNumber" in row.index:
+                row["LapNumber"] = lap_number
+            if "Circuit_ID" in row.index:
+                row["Circuit_ID"] = circuit_id
+            if "TrackTemp" in row.index:
+                row["TrackTemp"] = track_temp
+
+            X_row = pd.DataFrame([row])[list(feature_names)]
+            preds.append(model.predict(X_row)[0])
+
+        plt.plot(
+            ages,
+            preds,
+            linewidth=2,
+            color=COMPOUND_COLORS.get(comp, None),
+            label=f"{comp} (modèle)",
+        )
+
+    plt.xlabel("Âge du pneu (TyreLife, tours)")
+    plt.ylabel("Temps au tour (s)")
+    plt.title(
+        f"Dégradation des pneus – données brutes vs modèle\n"
+        f"Circuit : {circuit_name} | Temp piste : {track_temp}°C | Lap ref : {lap_number}"
+    )
+    plt.legend()
+    plt.grid(alpha=0.3)
+    plt.tight_layout()
+    plt.savefig(save_path)
+    print(f"Graphique raw vs modèle sauvegardé : {save_path}")

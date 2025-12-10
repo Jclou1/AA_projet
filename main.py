@@ -1,7 +1,7 @@
 from src.data_loader import load_multiple_races, build_races_config_for_circuit
 from src.features import prepare_data, split_data
-from src.models import train_models, evaluate_models, feature_importance
-from src.visualization import plot_predictions, plot_degradation_curve, plot_tyre_degradation_by_circuit, plot_mean_laptime_vs_tyre_life_by_temp, analyze_degradation_by_stint, analyze_degradation_by_stint_and_compound
+from src.models import train_models, evaluate_models, feature_importance, train_all_models, evaluate_all_models
+from src.visualization import plot_model_performance, plot_raw_vs_model_degradation
 from src.strat import generate_strategies, simulate_strategy
 import matplotlib.pyplot as plt
 def main():
@@ -24,15 +24,19 @@ def main():
         # (2024, 'Canada'),
 #    ]
 
+    circuit_name = "Australian"
+    total_laps=14
+    track_temp=15
+    pit_time=22
+
     races_config = build_races_config_for_circuit(
-    circuit_keyword="Bahrain",
+    circuit_keyword=circuit_name,
     start_year=2018,
     end_year=2024
 )
 
     # Chargement des données
     df = load_multiple_races(races_config)
-
     if df.empty:
         print("Aucune donnée chargée. Vérifiez votre connexion internet ou l'API.")
         return
@@ -46,6 +50,9 @@ def main():
     print(f"Données d'entraînement : {X_train.shape[0]} tours")
     print(f"Données de test : {X_test.shape[0]} tours")
 
+    # Template moyen pour les visualisations / simulations
+    feature_template = X_train.mean(numeric_only=True)
+    feature_names = X_train.columns
         # Courbe physique : dégradation des pneus en fonction de la température
     #plot_tyre_degradation_by_circuit(
     #    df,
@@ -68,27 +75,56 @@ def main():
     feature_importance(rf_model, feature_names)
 
     # Évaluation
-    print("\n Évaluation")
-    rf_preds, rf_rmse, rf_mae, lin_preds, lin_rmse, lin_mae = evaluate_models(
-        rf_model, linear_model, X_test, y_test)
+    #print("\n Évaluation")
+    #rf_preds, rf_rmse, rf_mae, lin_preds, lin_rmse, lin_mae = evaluate_models(
+    #    rf_model, linear_model, X_test, y_test)
+
+        # =============================
+    #  COMPARAISON MULTI-MODÈLES
+    # =============================
+    print("\n--- Comparaison de plusieurs modèles ---")
+
+    models = train_all_models(X_train, y_train)
+    best_name, results = evaluate_all_models(models, X_test, y_test)
+
+    print("\nRésumé des performances :")
+    for name, res in results.items():
+        print(f"{name:20s}  RMSE = {res['rmse']:.4f} s   MAE = {res['mae']:.4f} s")
+
+    print(f"\n✅ Meilleur modèle (RMSE) : {best_name} "
+          f"(RMSE = {results[best_name]['rmse']:.4f} s)")
+
+        # Graphique de comparaison des modèles
+    plot_model_performance(results, save_path="outputs/model_performance_models.png")
+
+
+    # Si tu veux, tu peux récupérer le meilleur modèle pour la suite :
+    best_model = models[best_name]
+
+    plot_raw_vs_model_degradation(
+        df,
+        best_model,              # ou best_model si tu veux
+        feature_template,
+        feature_names,
+        le_circuit,
+        circuit_name,
+        track_temp,
+        total_laps,          # par ex. milieu de ton relais de 14 tours
+        save_path="outputs/raw_vs_model_degradation.png",
+    )
 
 
     print("\n--- Simulation des stratégies de pit stop ---")
 
-    strategies = generate_strategies(total_laps=57)
+    strategies = generate_strategies(total_laps)
 
-    circuit_name = "Bahrain"
     circuit_id = le_circuit.transform([circuit_name])[0]
 
     results = {}
 
-    total_laps=57
-    track_temp=35
-    pit_time=22
-
     for name, strat in strategies.items():
         time_total = simulate_strategy(
-            rf_model,
+            best_model,
             strat,
             total_laps,
             circuit_id,
@@ -144,34 +180,34 @@ def main():
     print("Graphique Top 10 avec métadonnées complètes sauvegardé : outputs/strategies_top10_percent_annotated_full.png")
 
     # Visualisation
-    print("\n Génération des graphiques")
+    #print("\n Génération des graphiques")
     # Graphique 1 : Précision du modèle
-    plot_predictions(y_test, rf_preds,
-                     title="Réalité vs Prédictions (Random Forest)")
-    plot_predictions(y_test, lin_preds,
-                     title="Réalité vs Prédictions (Linéaire)")
+    #plot_predictions(y_test, rf_preds,
+    #                 title="Réalité vs Prédictions (Random Forest)")
+    #plot_predictions(y_test, lin_preds,
+    #                 title="Réalité vs Prédictions (Linéaire)")
 
     # Graphique 2 : Simulation Stratégique
     # On prend l'ID du circuit de Bahrain
-    try:
-        bahrain_id = le_circuit.transform(['Bahrain'])[0]
-        plot_degradation_curve(rf_model, circuit_id=bahrain_id, track_temp=35,
-                               title="Courbe de Dégradation des Pneus (Random Forest)")
-        plot_degradation_curve(
-            linear_model, circuit_id=bahrain_id, track_temp=35, title="Courbe de Dégradation des Pneus (Linéaire)")
-    except:
-        print("Circuit Bahrain non trouvé pour la simulation.")
+    #try:
+    #    bahrain_id = le_circuit.transform(['Bahrain'])[0]
+    #    plot_degradation_curve(rf_model, circuit_id=bahrain_id, track_temp=35,
+    #                           title="Courbe de Dégradation des Pneus (Random Forest)")
+    #    plot_degradation_curve(
+    #        linear_model, circuit_id=bahrain_id, track_temp=35, title="Courbe de Dégradation des Pneus (Linéaire)")
+    #except:
+    #    print("Circuit Bahrain non trouvé pour la simulation.")
 
     # Log la performance finale du modèle dans un fichier texte
-    with open("outputs/model_performance.txt", "a") as f:
-        f.write("Performance du modèle Random Forest Regressor\n")
-        f.write(f"RMSE: {rf_rmse:.4f} secondes\n")
-        f.write(f"MAE: {rf_mae:.4f} secondes\n")
-        f.write("\n")
-        f.write("Performance du modèle Régression Linéaire\n")
-        f.write(f"RMSE: {lin_rmse:.4f} secondes\n")
-        f.write(f"MAE: {lin_mae:.4f} secondes\n")
-        f.write("--------------------------------------------------\n")
+    #with open("outputs/model_performance.txt", "a") as f:
+    #    f.write("Performance du modèle Random Forest Regressor\n")
+    #    f.write(f"RMSE: {rf_rmse:.4f} secondes\n")
+    #    f.write(f"MAE: {rf_mae:.4f} secondes\n")
+    #    f.write("\n")
+    #    f.write("Performance du modèle Régression Linéaire\n")
+    #    f.write(f"RMSE: {lin_rmse:.4f} secondes\n")
+    #    f.write(f"MAE: {lin_mae:.4f} secondes\n")
+    #    f.write("--------------------------------------------------\n")
 
     print("\nTerminé avec succès !")
 

@@ -9,8 +9,8 @@ def simulate_strategy(
     strategy,
     total_laps,
     circuit_id,
-    track_temp=35,
-    pit_time=22
+    track_temp,
+    pit_time
 ):
     """
     Simule une course complète avec une stratégie donnée.

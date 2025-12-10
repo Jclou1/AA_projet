@@ -43,3 +43,59 @@ def feature_importance(model, feature_names):
     importances = model.feature_importances_
     for name, val in zip(feature_names, importances):
         print(f"{name} : {val:.3f}")
+
+from sklearn.ensemble import GradientBoostingRegressor
+from sklearn.neighbors import KNeighborsRegressor
+from sklearn.svm import SVR
+
+
+def train_all_models(X_train, y_train):
+    """
+    Entraîne plusieurs modèles de régression sur les mêmes données.
+    Retourne un dict {nom_modèle: instance_entraînée}.
+    """
+
+    models = {
+        "LinearRegression": LinearRegression(),
+        "RandomForest": RandomForestRegressor(
+            n_estimators=300,
+            random_state=42,
+            n_jobs=-1
+        ),
+        "GradientBoosting": GradientBoostingRegressor(
+            random_state=42
+        ),
+        "KNN": KNeighborsRegressor(n_neighbors=5),
+        "SVR_RBF": SVR(kernel="rbf", C=10.0, epsilon=0.1),
+    }
+
+    for name, model in models.items():
+        model.fit(X_train, y_train)
+
+    return models
+
+
+def evaluate_all_models(models, X_test, y_test):
+    """
+    Évalue tous les modèles fournis sur le même X_test / y_test.
+    Retourne:
+      - best_name : nom du meilleur modèle (RMSE la plus basse)
+      - results   : dict {nom: {"rmse": ..., "mae": ..., "preds": ...}}
+    """
+    results = {}
+
+    for name, model in models.items():
+        preds = model.predict(X_test)
+        rmse = np.sqrt(mean_squared_error(y_test, preds))
+        mae = mean_absolute_error(y_test, preds)
+
+        results[name] = {
+            "rmse": rmse,
+            "mae": mae,
+            "preds": preds
+        }
+
+    # Meilleur modèle = celui avec la plus petite RMSE
+    best_name = min(results, key=lambda n: results[n]["rmse"])
+
+    return best_name, results

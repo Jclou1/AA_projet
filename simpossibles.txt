@@ -1,0 +1,52 @@
+=== Circuits uniques FastF1 (2018–2024) ===
+                       EventName               Country           Location
+41          Abu Dhabi Grand Prix             Abu Dhabi         Yas Island
+0          Australian Grand Prix             Australia          Melbourne
+8            Austrian Grand Prix               Austria          Spielberg
+45            Styrian Grand Prix               Austria          Spielberg
+3          Azerbaijan Grand Prix            Azerbaijan               Baku
+61               Pre-Season Test               Bahrain            Bahrain
+1             Bahrain Grand Prix               Bahrain             Sakhir
+108           Pre-Season Testing               Bahrain             Sakhir
+59             Sakhir Grand Prix               Bahrain             Sakhir
+12            Belgian Grand Prix               Belgium  Spa-Francorchamps
+19          Brazilian Grand Prix                Brazil          São Paulo
+80          São Paulo Grand Prix                Brazil          São Paulo
+6            Canadian Grand Prix                Canada           Montréal
+2             Chinese Grand Prix                 China           Shanghai
+7              French Grand Prix                France       Le Castellet
+10             German Grand Prix               Germany         Hockenheim
+54              Eifel Grand Prix               Germany        Nürburgring
+48   70th Anniversary Grand Prix         Great Britain        Silverstone
+9             British Grand Prix         Great Britain        Silverstone
+11          Hungarian Grand Prix               Hungary           Budapest
+56     Emilia Romagna Grand Prix                 Italy              Imola
+13            Italian Grand Prix                 Italy              Monza
+52             Tuscan Grand Prix                 Italy            Mugello
+16           Japanese Grand Prix                 Japan             Suzuka
+18            Mexican Grand Prix                Mexico        Mexico City
+79        Mexico City Grand Prix                Mexico        Mexico City
+92             Monaco Grand Prix                Monaco             Monaco
+5              Monaco Grand Prix                Monaco        Monte Carlo
+74              Dutch Grand Prix           Netherlands          Zandvoort
+55         Portuguese Grand Prix              Portugal           Portimão
+81              Qatar Grand Prix                 Qatar             Lusail
+15            Russian Grand Prix                Russia              Sochi
+82      Saudi Arabian Grand Prix          Saudi Arabia             Jeddah
+102         Singapore Grand Prix             Singapore         Marina Bay
+14          Singapore Grand Prix             Singapore          Singapore
+42             Pre-Season Test 1                 Spain          Barcelona
+43             Pre-Season Test 2                 Spain          Barcelona
+4             Spanish Grand Prix                 Spain          Barcelona
+84      Pre-Season Track Session                 Spain              Spain
+57            Turkish Grand Prix                Turkey           Istanbul
+155         Abu Dhabi Grand Prix  United Arab Emirates         Yas Island
+20          Abu Dhabi Grand Prix  United Arab Emirates         Yas Marina
+143           British Grand Prix        United Kingdom        Silverstone
+17      United States Grand Prix         United States             Austin
+129         Las Vegas Grand Prix         United States          Las Vegas
+90              Miami Grand Prix         United States              Miami
+
+Circuit
+- Bahrain
+- Australian
