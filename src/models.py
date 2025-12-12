@@ -1,12 +1,12 @@
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.metrics import mean_squared_error, mean_absolute_error
+from sklearn.linear_model import LinearRegression 
+from sklearn.ensemble import GradientBoostingRegressor
+from sklearn.neighbors import KNeighborsRegressor
+from sklearn.svm import SVR
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+from src.strat import parse_strategy
 import numpy as np
-
-
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.linear_model import LinearRegression  # <--- Ajout
-from sklearn.metrics import mean_squared_error, mean_absolute_error
-import numpy as np
+import pandas as pd
 
 
 def train_models(X_train, y_train):
@@ -44,10 +44,6 @@ def feature_importance(model, feature_names):
     for name, val in zip(feature_names, importances):
         print(f"{name} : {val:.3f}")
 
-from sklearn.ensemble import GradientBoostingRegressor
-from sklearn.neighbors import KNeighborsRegressor
-from sklearn.svm import SVR
-
 
 def train_all_models(X_train, y_train):
     """
@@ -78,24 +74,29 @@ def train_all_models(X_train, y_train):
 def evaluate_all_models(models, X_test, y_test):
     """
     Évalue tous les modèles fournis sur le même X_test / y_test.
-    Retourne:
-      - best_name : nom du meilleur modèle (RMSE la plus basse)
-      - results   : dict {nom: {"rmse": ..., "mae": ..., "preds": ...}}
+    Un DataFrame des résultats.
     """
-    results = {}
+    results = []
 
+    # Predict
     for name, model in models.items():
-        preds = model.predict(X_test)
-        rmse = np.sqrt(mean_squared_error(y_test, preds))
-        mae = mean_absolute_error(y_test, preds)
+        y_pred = model.predict(X_test)
 
-        results[name] = {
-            "rmse": rmse,
-            "mae": mae,
-            "preds": preds
-        }
+        st = parse_strategy(X_test, pd.Series(y_pred))
 
-    # Meilleur modèle = celui avec la plus petite RMSE
-    best_name = min(results, key=lambda n: results[n]["rmse"])
+        # Metrics
+        mae = mean_absolute_error(y_test, y_pred)
+        mse = mean_squared_error(y_test, y_pred)
+        rmse = np.sqrt(mse)
+        r2 = r2_score(y_test, y_pred)
 
-    return best_name, results
+        results.append({
+            "Model": name,
+            "MAE": mae,
+            "MSE": mse,
+            "RMSE": rmse,
+            "R2": r2,
+            "Strat" : st
+        })
+
+    return pd.DataFrame(results)

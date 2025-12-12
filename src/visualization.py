@@ -432,8 +432,8 @@ def plot_model_performance(results, save_path="outputs/model_performance_models.
     results : dict {nom_modèle: {"rmse": ..., "mae": ..., "preds": ...}}
                (ce que retourne evaluate_all_models)
     """
-    model_names = list(results.keys())
-    rmses = [results[m]["rmse"] for m in model_names]
+    model_names = results['Model'].tolist()
+    rmses = [results.loc[results['Model'] == m, "RMSE"].values[0] for m in model_names]
 
     # On trouve le meilleur modèle pour le mettre en avant
     best_idx = min(range(len(model_names)), key=lambda i: rmses[i])
@@ -607,3 +607,61 @@ def plot_degradation_panels(
     plt.tight_layout()
     plt.savefig(save_path, bbox_inches="tight")
     print(f"Graphique panneaux sauvegardé : {save_path}")
+
+
+def plot_actual_strat_vs_predicted_strat(actual_strat, results, model_name="RandomForest"):
+    """
+    Trace les stratégies pneus par tour pour chaque circuit.
+    X = numéro de tour
+    Y = compound (0=SOFT, 1=MEDIUM, ...)
+    Un graphique par circuit.
+    
+    Params:
+        actual_strat (dict): {circuit: [(compound_name, length), ...], ...}
+        results (pd.DataFrame): DataFrame avec colonnes 'Model' et 'Strat'
+        model_name (str): modèle à afficher
+    """
+    # Récupérer la stratégie prédite pour le modèle
+    predicted_strat = results.loc[results['Model'] == model_name, 'Strat'].values[0]
+    
+    for circuit in actual_strat.keys():
+        plt.figure(figsize=(12,6))
+        
+        # --- Réel ---
+        actual_list = actual_strat[circuit]
+        actual_laps = []
+        actual_compounds = []
+        lap_counter = 1
+        for compound, length in actual_list:
+            laps = list(range(lap_counter, lap_counter + length))
+            actual_laps.extend(laps)
+            actual_compounds.extend([compound]*length)
+            lap_counter += length
+        
+        # --- Prédit ---
+        predicted_list = predicted_strat.get(circuit, [])
+        pred_laps = []
+        pred_compounds = []
+        lap_counter = 1
+        for compound, length in predicted_list:
+            laps = list(range(lap_counter, lap_counter + length))
+            pred_laps.extend(laps)
+            pred_compounds.extend([compound]*length)
+            lap_counter += length
+        
+        # Scatter plot
+        plt.scatter(actual_laps, actual_compounds, color='blue', label='Réel', alpha=0.7)
+        plt.scatter(pred_laps, pred_compounds, color='orange', marker='x', label='Prédit', alpha=0.8)
+        
+        plt.xlabel("Tour")
+        plt.ylabel("Pneu (compound)")
+        plt.title(f"{circuit} - Stratégie pneus: réel vs prédit ({model_name})")
+        plt.yticks(range(5), ["SOFT","MEDIUM","HARD","INTERMEDIATE","WET"])
+        plt.legend()
+        plt.grid(True)
+        plt.tight_layout()
+        
+        filename = f"outputs/strat_{circuit}_{model_name}.png"
+        plt.savefig(filename)
+        print(f"Graphique sauvegardé sous '{filename}'")
+        plt.show()

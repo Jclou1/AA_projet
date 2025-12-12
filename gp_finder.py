@@ -19,12 +19,11 @@ def list_all_events(start_year=2018, end_year=2024):
     unique_events = (
         events_df[["EventName", "Country", "Location"]]
         .drop_duplicates()
-        .sort_values(["Country", "Location", "EventName"])
     )
 
     return events_df, unique_events
 
-all_events, all_circuits = list_all_events(2018, 2024)
+all_events, all_circuits = list_all_events(2024, 2024)
 
-print("=== Circuits uniques FastF1 (2018–2024) ===")
+print("=== Circuits uniques FastF1 (2024) ===")
 print(all_circuits)
