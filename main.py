@@ -63,13 +63,12 @@ def main():
 
     # Préparation des features
     print("\n Préparation des données")
-    X, y = prepare_data(df_driver['1'])  # Exemple pour VER
+    X, y, circuit_map = prepare_data(df_driver['1'])  # Exemple pour VER
 
     # Séparation Entraînement / Test
     X_train, X_test, y_train, y_test = split_data(X, y, group_col="Circuit_ID")
 
     actual_strat = parse_strategy(X_test, y_test)
-    print(actual_strat)
 
     # =============================
     #  COMPARAISON MULTI-MODÈLES
@@ -85,10 +84,11 @@ def main():
                 f"MAE = {results.loc[results['Model'] == model, 'MAE'].values[0]:.4f}, \n"
                 f"MSE = {results.loc[results['Model'] == model, 'MSE'].values[0]:.4f}, \n"
                 f"R2 = {results.loc[results['Model'] == model, 'R2'].values[0]:.4f}, \n"
-                f"Strat = {results.loc[results['Model'] == model, 'Strat'].values[0]}")
+                f"Strat = {results.loc[results['Model'] == model, 'Strat'].values[0]}, \n"
+                f"actual = {actual_strat}\n")
 
     # Visualisation des performances
-    plot_actual_strat_vs_predicted_strat(actual_strat, results, model_name="RandomForest")
+    plot_actual_strat_vs_predicted_strat(actual_strat, results, circuit_map, model_name="RandomForest")
     
 
     print("\nTerminé avec succès !")

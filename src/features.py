@@ -18,6 +18,7 @@ def prepare_data(df):
     # On utilise LabelEncoder pour transformer les noms de circuits en ID
     circuit = LabelEncoder()
     df['Circuit_ID'] = circuit.fit_transform(df['Circuit'])
+    circuits_map = {index: label for index, label in zip(df['Circuit_ID'], df['Circuit'])}
 
     team = LabelEncoder()
     df['Team_Encoded'] = team.fit_transform(df['Team'])
@@ -43,7 +44,7 @@ def prepare_data(df):
     X = df[features]
     y = df['Compound_Encoded']  # Ce qu'on veut prédire
 
-    return X, y
+    return X, y, circuits_map
 
 
 def split_data(X, y, group_col):

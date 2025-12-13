@@ -3,6 +3,13 @@ import seaborn as sns
 import pandas as pd
 import numpy as np
 
+COMPOUND_MAP = {
+    "SOFT": 0,
+    "MEDIUM": 1,
+    "HARD": 2,
+    "INTERMEDIATE": 3,
+    "WET": 4
+}
 
 def plot_predictions(y_test, predictions, title="Réalité vs Prédictions"):
     """
@@ -609,7 +616,7 @@ def plot_degradation_panels(
     print(f"Graphique panneaux sauvegardé : {save_path}")
 
 
-def plot_actual_strat_vs_predicted_strat(actual_strat, results, model_name="RandomForest"):
+def plot_actual_strat_vs_predicted_strat(actual_strat, results, circuits_map, model_name="RandomForest"):
     """
     Trace les stratégies pneus par tour pour chaque circuit.
     X = numéro de tour
@@ -633,9 +640,10 @@ def plot_actual_strat_vs_predicted_strat(actual_strat, results, model_name="Rand
         actual_compounds = []
         lap_counter = 1
         for compound, length in actual_list:
+            y_val = COMPOUND_MAP[compound]
             laps = list(range(lap_counter, lap_counter + length))
             actual_laps.extend(laps)
-            actual_compounds.extend([compound]*length)
+            actual_compounds.extend([y_val]*length)
             lap_counter += length
         
         # --- Prédit ---
@@ -644,9 +652,10 @@ def plot_actual_strat_vs_predicted_strat(actual_strat, results, model_name="Rand
         pred_compounds = []
         lap_counter = 1
         for compound, length in predicted_list:
+            y_val = COMPOUND_MAP[compound]
             laps = list(range(lap_counter, lap_counter + length))
             pred_laps.extend(laps)
-            pred_compounds.extend([compound]*length)
+            pred_compounds.extend([y_val]*length)
             lap_counter += length
         
         # Scatter plot
@@ -655,13 +664,13 @@ def plot_actual_strat_vs_predicted_strat(actual_strat, results, model_name="Rand
         
         plt.xlabel("Tour")
         plt.ylabel("Pneu (compound)")
-        plt.title(f"{circuit} - Stratégie pneus: réel vs prédit ({model_name})")
+        plt.title(f"{circuits_map[circuit]} - Stratégie pneus: réel vs prédit ({model_name})")
         plt.yticks(range(5), ["SOFT","MEDIUM","HARD","INTERMEDIATE","WET"])
         plt.legend()
         plt.grid(True)
         plt.tight_layout()
         
-        filename = f"outputs/strat_{circuit}_{model_name}.png"
+        filename = f"outputs/strat_{circuits_map[circuit]}_{model_name}.png"
         plt.savefig(filename)
         print(f"Graphique sauvegardé sous '{filename}'")
         plt.show()
