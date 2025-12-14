@@ -61,7 +61,7 @@ def load_race_data(year, gp_identifier, session_type='R'):
     laps = laps.pick_track_status('1234567', 'any')
 
     # Filtrage des composés de pneus
-    target_compounds = ['SOFT', 'MEDIUM', 'HARD', 'INTERMEDIATE', 'WET']
+    target_compounds = ['SOFT', 'MEDIUM', 'HARD']
     laps = laps[laps['Compound'].isin(target_compounds)]
 
     # Enrichissement avec la météo
@@ -73,6 +73,11 @@ def load_race_data(year, gp_identifier, session_type='R'):
     if not weather_data.empty:
         # On s'assure que les index correspondent
         weather_cols = ['AirTemp', 'TrackTemp', 'Rainfall']
+        # Check if there was rain, and if so then return empty
+        if weather_data['Rainfall'].max() > 0:
+            print("Session avec pluie détectée, les données seront ignorées.")
+            return pd.DataFrame()
+
         # Note: get_weather_data retourne un DF aligné avec les laps fournis
         weather_data = weather_data.reset_index(drop=True)
 
@@ -86,6 +91,7 @@ def load_race_data(year, gp_identifier, session_type='R'):
 
     cols_to_keep = [
         'DriverNumber',
+        'Driver',
         'Team',
         'LapNumber',
         'TrackStatus',
@@ -128,6 +134,9 @@ def load_multiple_races(races_config):
 
     for year, gp in races_config:
         df = load_race_data(year, gp)
+        if df.empty:
+            print(f"Aucune donnée pour {year} - {gp}, passage au suivant.")
+            continue
         # On ajoute une colonne pour identifier le circuit (utile pour le modèle)
         df['Circuit'] = str(gp)
         df['Year'] = year
@@ -137,6 +146,7 @@ def load_multiple_races(races_config):
         return pd.DataFrame()
 
     return pd.concat(all_data, ignore_index=True)
+
 
 # ---------------------------------------------------------
 # Bloc de test (s'exécute seulement si on lance le fichier directement)
@@ -149,4 +159,3 @@ if __name__ == "__main__":
     print(df.head())
     print("\n--- Infos ---")
     print(df.info())
-

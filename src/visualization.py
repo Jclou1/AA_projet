@@ -11,6 +11,7 @@ COMPOUND_MAP = {
     "WET": 4
 }
 
+
 def plot_predictions(y_test, predictions, title="Réalité vs Prédictions"):
     """
     Affiche un graphique de dispersion pour voir si les prédictions collent à la réalité.
@@ -123,7 +124,8 @@ def plot_degradation_curve(model, circuit_id, track_temp=35, title="Courbe de D�
     plt.savefig(f"outputs/courbe_degradation_{rand}.png")
     print(
         f"Nouvelle courbe générée : outputs/courbe_degradation_{rand}.png")
-    
+
+
 def plot_tyre_degradation_by_circuit(df, circuit_name, title=None):
     """
     Visualise la dégradation des pneus sur un circuit donné,
@@ -223,9 +225,10 @@ def plot_mean_laptime_vs_tyre_life_by_temp(df, circuit_name=None):
 
     plt.xlabel("Usure du pneu (TyreLife)")
     plt.ylabel("Temps moyen au tour (sec)")
-    
+
     if circuit_name:
-        plt.title(f"Dégradation des pneus selon la température – {circuit_name}")
+        plt.title(
+            f"Dégradation des pneus selon la température – {circuit_name}")
     else:
         plt.title("Dégradation des pneus selon la température")
 
@@ -239,6 +242,7 @@ def plot_mean_laptime_vs_tyre_life_by_temp(df, circuit_name=None):
     plt.savefig(filename)
 
     print(f"Graphe tendance usure par température sauvegardé : {filename}")
+
 
 def analyze_degradation_by_stint(df, circuit_name=None):
     """
@@ -308,7 +312,7 @@ def analyze_degradation_by_stint(df, circuit_name=None):
 
     plt.xlabel("Usure du pneu (TyreLife)")
     plt.ylabel("Temps au tour (sec)")
-    
+
     if circuit_name:
         plt.title(f"Dégradation des pneus par relais – {circuit_name}")
     else:
@@ -393,7 +397,8 @@ def analyze_degradation_by_stint_and_compound(df, circuit_name=None):
     plt.boxplot(data_to_plot, labels=labels, showfliers=True)
     plt.ylabel("Pente de dégradation (sec / tour)")
     if circuit_name:
-        plt.title(f"Comparaison de la dégradation par type de pneu – {circuit_name}")
+        plt.title(
+            f"Comparaison de la dégradation par type de pneu – {circuit_name}")
     else:
         plt.title("Comparaison de la dégradation par type de pneu")
 
@@ -432,37 +437,6 @@ def analyze_degradation_by_stint_and_compound(df, circuit_name=None):
 
     return results
 
-def plot_model_performance(results, save_path="outputs/model_performance_models.png"):
-    """
-    Affiche un graphique comparant la RMSE de chaque modèle.
-
-    results : dict {nom_modèle: {"rmse": ..., "mae": ..., "preds": ...}}
-               (ce que retourne evaluate_all_models)
-    """
-    model_names = results['Model'].tolist()
-    rmses = [results.loc[results['Model'] == m, "RMSE"].values[0] for m in model_names]
-
-    # On trouve le meilleur modèle pour le mettre en avant
-    best_idx = min(range(len(model_names)), key=lambda i: rmses[i])
-
-    plt.figure(figsize=(8, 5))
-    bars = plt.bar(range(len(model_names)), rmses)
-
-    # Met le meilleur modèle en vert
-    bars[best_idx].set_color("green")
-
-    plt.xticks(range(len(model_names)), model_names, rotation=20, ha="right")
-    plt.ylabel("RMSE (s)")
-    plt.title("Comparaison des modèles – RMSE sur l'ensemble de test")
-
-    # Affiche la valeur numérique au-dessus de chaque barre
-    for i, val in enumerate(rmses):
-        plt.text(i, val + 0.03, f"{val:.2f}", ha="center", fontsize=9)
-
-    plt.grid(axis="y", alpha=0.3)
-    plt.tight_layout()
-    plt.savefig(save_path)
-    print(f"Graphique de performance des modèles sauvegardé : {save_path}")
 
 COMPOUND_COLORS = {
     "SOFT": "red",
@@ -470,170 +444,26 @@ COMPOUND_COLORS = {
     "HARD": "black",
 }
 
-def plot_degradation_panels(
-    df,
-    model,
-    feature_template,
-    feature_names,
-    le_circuit,
-    circuit_name,
-    track_temp=35,
-    lap_number=14,
-    max_tyre_life=None,
-    save_path="outputs/degradation_panels.png",
-):
-    """
-    3 sous-graphes (SOFT/MEDIUM/HARD) :
-      - nuage de points gris = données brutes
-      - ligne pleine = moyenne des données par TyreLife
-      - ligne pointillée = modèle ML
 
-    C'est beaucoup plus lisible que tout empilé dans un seul graphe.
-    """
-
-    lap_col = "LapTime_Sec"
-
-    # 1) Filtrer sur le circuit
-    if "Circuit" not in df.columns:
-        print("❌ Colonne 'Circuit' absente.")
-        print("Colonnes :", list(df.columns))
-        return
-
-    df_circ = df[df["Circuit"] == circuit_name].copy()
-    if df_circ.empty:
-        print(f"❌ Aucune donnée pour le circuit '{circuit_name}'")
-        return
-
-    # Convertir en secondes si besoin
-    lap_series = df_circ[lap_col]
-    if np.issubdtype(lap_series.dtype, np.dtype("timedelta64[ns]")):
-        df_circ["_LapTime_sec"] = lap_series.dt.total_seconds()
-    else:
-        df_circ["_LapTime_sec"] = lap_series.astype(float)
-
-    # Encodage du circuit
-    circuit_id = le_circuit.transform([circuit_name])[0]
-
-    compounds = ["SOFT", "MEDIUM", "HARD"]
-
-    fig, axes = plt.subplots(1, 3, figsize=(15, 4.5), sharey=True)
-    axes = np.atleast_1d(axes)
-
-    for ax, comp in zip(axes, compounds):
-        if "Compound" not in df_circ.columns or "TyreLife" not in df_circ.columns:
-            print("❌ Colonnes 'Compound' ou 'TyreLife' manquantes.")
-            return
-
-        df_comp = df_circ[df_circ["Compound"] == comp].copy()
-        if df_comp.empty:
-            ax.set_title(f"{comp} (aucune donnée)")
-            continue
-
-        if max_tyre_life is not None:
-            df_comp = df_comp[df_comp["TyreLife"] <= max_tyre_life]
-
-        # Nuage de points brut (gris)
-        ax.scatter(
-            df_comp["TyreLife"],
-            df_comp["_LapTime_sec"],
-            alpha=0.15,
-            s=8,
-            color="grey",
-            label="Données brutes" if comp == "SOFT" else None,
-        )
-
-        # Moyenne + écart-type par TyreLife
-        stats = (
-            df_comp.groupby("TyreLife")["_LapTime_sec"]
-            .agg(["mean", "std", "count"])
-            .reset_index()
-        )
-        ages = stats["TyreLife"].values
-        mean_data = stats["mean"].values
-        std_data = stats["std"].values
-
-        ax.plot(
-            ages,
-            mean_data,
-            linewidth=2,
-            color=COMPOUND_COLORS.get(comp, None),
-            label="Moyenne données" if comp == "SOFT" else None,
-        )
-        ax.fill_between(
-            ages,
-            mean_data - std_data,
-            mean_data + std_data,
-            alpha=0.15,
-            color=COMPOUND_COLORS.get(comp, None),
-        )
-
-        # Courbe du modèle pour les mêmes ages
-        preds = []
-        mapping = {"SOFT": 0, "MEDIUM": 1, "HARD": 2}
-        for age in ages:
-            row = feature_template.copy()
-            if "TyreLife" in row.index:
-                row["TyreLife"] = age
-            if "Compound_Encoded" in row.index:
-                row["Compound_Encoded"] = mapping[comp]
-            if "LapNumber" in row.index:
-                row["LapNumber"] = lap_number
-            if "Circuit_ID" in row.index:
-                row["Circuit_ID"] = circuit_id
-            if "TrackTemp" in row.index:
-                row["TrackTemp"] = track_temp
-
-            X_row = pd.DataFrame([row])[list(feature_names)]
-            preds.append(model.predict(X_row)[0])
-
-        ax.plot(
-            ages,
-            preds,
-            linestyle="--",
-            linewidth=2,
-            color=COMPOUND_COLORS.get(comp, None),
-            label="Modèle" if comp == "SOFT" else None,
-        )
-
-        ax.set_title(comp)
-        ax.set_xlabel("TyreLife (tours)")
-
-    axes[0].set_ylabel("Temps au tour (s)")
-
-    # Légende commune
-    handles, labels = axes[0].get_legend_handles_labels()
-    if handles:
-        fig.legend(handles, labels, loc="upper center", ncol=3)
-
-    fig.suptitle(
-        f"Dégradation des pneus – {circuit_name}\n"
-        f"Temp piste : {track_temp}°C | Lap ref : {lap_number}",
-        y=1.03,
-        fontsize=12,
-    )
-    plt.tight_layout()
-    plt.savefig(save_path, bbox_inches="tight")
-    print(f"Graphique panneaux sauvegardé : {save_path}")
-
-
-def plot_actual_strat_vs_predicted_strat(actual_strat, results, circuits_map, model_name="RandomForest"):
+def plot_actual_strat_vs_predicted_strat(actual_strat, results, driver, model_name="RandomForest"):
     """
     Trace les stratégies pneus par tour pour chaque circuit.
     X = numéro de tour
     Y = compound (0=SOFT, 1=MEDIUM, ...)
     Un graphique par circuit.
-    
+
     Params:
         actual_strat (dict): {circuit: [(compound_name, length), ...], ...}
         results (pd.DataFrame): DataFrame avec colonnes 'Model' et 'Strat'
         model_name (str): modèle à afficher
     """
     # Récupérer la stratégie prédite pour le modèle
-    predicted_strat = results.loc[results['Model'] == model_name, 'Strat'].values[0]
-    
+    predicted_strat = results.loc[results['Model']
+                                  == model_name, 'Strat'].values[0]
+
     for circuit in actual_strat.keys():
-        plt.figure(figsize=(12,6))
-        
+        plt.figure(figsize=(12, 6))
+
         # --- Réel ---
         actual_list = actual_strat[circuit]
         actual_laps = []
@@ -645,7 +475,7 @@ def plot_actual_strat_vs_predicted_strat(actual_strat, results, circuits_map, mo
             actual_laps.extend(laps)
             actual_compounds.extend([y_val]*length)
             lap_counter += length
-        
+
         # --- Prédit ---
         predicted_list = predicted_strat.get(circuit, [])
         pred_laps = []
@@ -657,20 +487,48 @@ def plot_actual_strat_vs_predicted_strat(actual_strat, results, circuits_map, mo
             pred_laps.extend(laps)
             pred_compounds.extend([y_val]*length)
             lap_counter += length
-        
+
         # Scatter plot
-        plt.scatter(actual_laps, actual_compounds, color='blue', label='Réel', alpha=0.7)
-        plt.scatter(pred_laps, pred_compounds, color='orange', marker='x', label='Prédit', alpha=0.8)
-        
+        plt.scatter(actual_laps, actual_compounds,
+                    color='blue', label='Réel', alpha=0.7)
+        plt.scatter(pred_laps, pred_compounds, color='orange',
+                    marker='x', label='Prédit', alpha=0.8)
+
         plt.xlabel("Tour")
         plt.ylabel("Pneu (compound)")
-        plt.title(f"{circuits_map[circuit]} - Stratégie pneus: réel vs prédit ({model_name})")
-        plt.yticks(range(5), ["SOFT","MEDIUM","HARD","INTERMEDIATE","WET"])
+        plt.title(
+            f"Abu_Dhabi - Stratégie pneus ({model_name}, Pilote: {driver})")
+        plt.yticks(range(3), ["SOFT", "MEDIUM", "HARD"])
         plt.legend()
         plt.grid(True)
         plt.tight_layout()
-        
-        filename = f"outputs/strat_{circuits_map[circuit]}_{model_name}.png"
+
+        filename = f"outputs/drivers/strat_Abu_Dhabi_2025_{model_name}_{driver}.png"
         plt.savefig(filename)
         print(f"Graphique sauvegardé sous '{filename}'")
-        plt.show()
+        # plt.show()
+
+
+def plot_accuracy_comparison(average_accuracy_per_model):
+    """
+    Trace un graphique comparant les précisions moyennes par modèle.
+    """
+    models = list(average_accuracy_per_model.keys())
+    avg_accuracies = [np.mean(average_accuracy_per_model[m]) for m in models]
+
+    plt.figure(figsize=(10, 6))
+    # Pass the custom palette with custom hex colors
+    custom_palette = ["#121F45", "#223971", "#6674A3", "#CC1E4A", "#FFC906"]
+    sns.barplot(x=models, y=avg_accuracies, palette=custom_palette)
+
+    plt.xlabel("Modèle")
+    plt.ylabel("Précision Moyenne")
+    plt.title("Comparaison des Précisions Moyennes par Modèle")
+    plt.ylim(0, 1)
+    plt.grid(axis='y', alpha=0.3)
+
+    rand = np.random.randint(0, 10000)
+    filename = f"outputs/accuracy_comparison_{rand}.png"
+    plt.tight_layout()
+    plt.savefig(filename)
+    print(f"Graphique de comparaison des précisions sauvegardé : {filename}")

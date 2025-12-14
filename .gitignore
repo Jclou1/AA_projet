@@ -2,3 +2,7 @@ venv/
 __pycache__/
 *_cache/
 
+outputs/
+
+**/.DS_Store
+
