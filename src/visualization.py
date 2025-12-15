@@ -11,432 +11,7 @@ COMPOUND_MAP = {
     "WET": 4
 }
 
-
-def plot_predictions(y_test, predictions, title="Réalité vs Prédictions"):
-    """
-    Affiche un graphique de dispersion pour voir si les prédictions collent à la réalité.
-    """
-    plt.figure(figsize=(10, 6))
-    plt.scatter(y_test, predictions, alpha=0.5)
-
-    # Ligne parfaite (y=x)
-    min_val = min(y_test.min(), predictions.min())
-    max_val = max(y_test.max(), predictions.max())
-    plt.plot([min_val, max_val], [min_val, max_val], 'r--', lw=2)
-
-    plt.xlabel("Temps Réel (sec)")
-    plt.ylabel("Temps Prédit (sec)")
-    plt.title(title)
-    plt.grid(True)
-    plt.tight_layout()
-
-    rand = np.random.randint(0, 10000)
-    plt.savefig(f"outputs/resultats_model_{rand}.png")
-    print(f"Graphique sauvegardé sous 'outputs/resultats_model_{rand}.png'")
-    # plt.show()
-
-
-def plot_degradation_curve(model, circuit_id, track_temp=30, title="Courbe de Dégradation des Pneus"):
-    """
-    Simule une courbe de dégradation pour l'affiche (Soft vs Medium vs Hard).
-    Supposons un tour 1 à 30 avec une température fixe.
-    """
-
-    laps = np.arange(1, 40)  # 40 tours
-
-    # On crée des données fictives pour la simulation
-    # 0=Soft, 1=Medium, 2=Hard
-    compounds = {'Soft': 0, 'Medium': 1, 'Hard': 2}
-
-    plt.figure(figsize=(12, 6))
-
-    for name, code in compounds.items():
-        # Création des features pour la prédiction
-        # ['TyreLife', 'Compound_Encoded', 'LapNumber', 'Circuit_ID', 'TrackTemp']
-        # On assume que TyreLife = LapNumber pour un relais depuis le départ
-        X_sim = pd.DataFrame({
-            'TyreLife': laps,
-            'Compound_Encoded': [code] * len(laps),
-            'LapNumber': laps,
-            'Circuit_ID': [circuit_id] * len(laps),
-            'TrackTemp': [track_temp] * len(laps)
-        })
-
-        preds = model.predict(X_sim)
-        plt.plot(laps, preds, label=f'{name} Compound', linewidth=2)
-
-    plt.xlabel("Âge du pneu (Tours)")
-    plt.ylabel("Temps au tour estimé (sec)")
-    plt.title(f"{title} (Temp Piste: {track_temp}°C)")
-    plt.legend()
-    plt.grid(True)
-    rand = np.random.randint(0, 10000)
-    plt.savefig(f"outputs/simulation_degradation_{rand}.png")
-    print(
-        f"Graphique sauvegardé sous 'outputs/simulation_degradation_{rand}.png'")
-
-
-def plot_degradation_curve(model, circuit_id, track_temp=35, title="Courbe de Dégradation des Pneus"):
-    """
-    Simule une courbe de dégradation en isolant l'usure des pneus.
-    On fixe le 'LapNumber' (poids essence) pour ne voir que l'effet gomme.
-    """
-
-    # On simule une usure de 1 à 30 tours
-    laps = np.arange(1, 31)
-
-    # On fixe le LapNumber à 25 (milieu de course) pour tout le monde.
-    # Ainsi, le modèle ne voit pas la voiture s'alléger par la diminution du carburant.
-    fixed_fuel_lap = 25
-
-    compounds = {'Soft': 0, 'Medium': 1, 'Hard': 2}
-    colors = {'Soft': 'red', 'Medium': 'yellow',
-              'Hard': 'black'}  # Couleurs F1 standards
-
-    plt.figure(figsize=(10, 6))
-
-    for name, code in compounds.items():
-        # Création des données de simulation
-        X_sim = pd.DataFrame({
-            'TyreLife': laps,
-            'Compound_Encoded': [code] * len(laps),
-
-            'LapNumber': [fixed_fuel_lap] * len(laps),
-
-            'Circuit_ID': [circuit_id] * len(laps),
-            'TrackTemp': [track_temp] * len(laps)
-        })
-
-        preds = model.predict(X_sim)
-
-        plt.plot(laps, preds, label=f'{name}',
-                 linewidth=2, color=colors.get(name, 'blue'))
-
-    plt.xlabel("Âge du pneu (Tours)")
-    plt.ylabel("Temps au tour estimé (sec) - À iso-carburant")
-    plt.title(
-        f"{title} (Poids fixe: Tour {fixed_fuel_lap}, Temp Piste: {track_temp}°C)")
-    plt.legend()
-    plt.grid(True, alpha=0.3)
-
-    # Sauvegarde
-    rand = np.random.randint(0, 10000)
-    plt.savefig(f"outputs/courbe_degradation_{rand}.png")
-    print(
-        f"Nouvelle courbe générée : outputs/courbe_degradation_{rand}.png")
-
-
-def plot_tyre_degradation_by_circuit(df, circuit_name, title=None):
-    """
-    Visualise la dégradation des pneus sur un circuit donné,
-    en comparant plusieurs années / courses.
-
-    Paramètres:
-      - df : DataFrame global (celui venant de load_multiple_races)
-              doit contenir au moins :
-                ['Circuit', 'Year', 'TyreLife', 'LapTime_Sec', 'TrackTemp']
-      - circuit_name : nom du circuit tel que stocké dans df['Circuit']
-                       (ex: 'Bahrain', 'Saudi Arabia', etc.)
-    """
-
-    # Filtre sur le circuit demandé
-    data = df[df['Circuit'] == circuit_name].copy()
-
-    if data.empty:
-        print(f"Aucune donnée trouvée pour le circuit '{circuit_name}'")
-        return
-
-    # Si pas de titre fourni, on en met un par défaut
-    if title is None:
-        title = f"Dégradation des pneus sur {circuit_name} (comparaison par année)"
-
-    years = sorted(data['Year'].unique())
-
-    plt.figure(figsize=(10, 6))
-
-    # On boucle sur chaque année pour les distinguer par marqueur/couleur
-    markers = ['o', 's', '^', 'D', 'x', 'P', 'v', '*']
-    import itertools
-    marker_cycle = itertools.cycle(markers)
-
-    # On va aussi colorier par TrackTemp
-    # On garde la même échelle de couleur pour tout le circuit
-    temps = data['TrackTemp']
-    vmin = temps.min()
-    vmax = temps.max()
-
-    for year in years:
-        sub = data[data['Year'] == year]
-
-        marker = next(marker_cycle)
-
-        sc = plt.scatter(
-            sub['TyreLife'],
-            sub['LapTime_Sec'],
-            c=sub['TrackTemp'],
-            vmin=vmin,
-            vmax=vmax,
-            alpha=0.6,
-            marker=marker,
-            label=str(year)
-        )
-
-    cbar = plt.colorbar(sc)
-    cbar.set_label("Température piste (°C)")
-
-    plt.xlabel("Usure du pneu (TyreLife, en tours)")
-    plt.ylabel("Temps au tour (sec)")
-    plt.title(title)
-    plt.grid(True, alpha=0.3)
-    plt.legend(title="Année", loc="best")
-
-    plt.tight_layout()
-
-    import numpy as np
-    rand = np.random.randint(0, 10000)
-    filename = f"outputs/tyre_deg_{circuit_name.lower()}_{rand}.png"
-    plt.savefig(filename)
-    print(f"Graphe dégradation par circuit sauvegardé dans '{filename}'")
-
-
-def plot_mean_laptime_vs_tyre_life_by_temp(df, circuit_name=None):
-    """
-    Tendance de l'usure pour différentes plages de température de piste.
-    """
-
-    data = df.copy()
-    if circuit_name is not None:
-        data = data[data["Circuit"] == circuit_name]
-
-    data["TempBin"] = pd.cut(
-        data["TrackTemp"],
-        bins=[0, 25, 35, 50],
-        labels=["Froid", "Modéré", "Chaud"]
-    )
-
-    data["TyreLifeBin"] = data["TyreLife"].astype(int)
-
-    plt.figure(figsize=(10, 6))
-
-    for label in data["TempBin"].dropna().unique():
-        sub = data[data["TempBin"] == label]
-        grouped = sub.groupby("TyreLifeBin")["LapTime_Sec"].mean()
-        plt.plot(grouped.index, grouped.values, marker='o', label=str(label))
-
-    plt.xlabel("Usure du pneu (TyreLife)")
-    plt.ylabel("Temps moyen au tour (sec)")
-
-    if circuit_name:
-        plt.title(
-            f"Dégradation des pneus selon la température – {circuit_name}")
-    else:
-        plt.title("Dégradation des pneus selon la température")
-
-    plt.legend(title="Température piste")
-    plt.grid(True, alpha=0.3)
-
-    import numpy as np
-    rand = np.random.randint(0, 10000)
-    filename = f"outputs/tendance_usure_temp_{rand}.png"
-    plt.tight_layout()
-    plt.savefig(filename)
-
-    print(f"Graphe tendance usure par température sauvegardé : {filename}")
-
-
-def analyze_degradation_by_stint(df, circuit_name=None):
-    """
-    Analyse la dégradation des pneus à l'intérieur de chaque relais (Stint).
-    Calcule la pente (sec/tour) de la dégradation pour chaque relais valide
-    et génère un graphique sur quelques relais représentatifs.
-    """
-
-    data = df.copy()
-
-    if circuit_name is not None:
-        data = data[data["Circuit"] == circuit_name]
-
-    # On garde seulement les relais exploitables
-    data = data.dropna(subset=["Stint", "TyreLife", "LapTime_Sec"])
-
-    import numpy as np
-    import matplotlib.pyplot as plt
-
-    slopes = []
-    valid_stints = []
-
-    for stint_id in sorted(data["Stint"].unique()):
-        sub = data[data["Stint"] == stint_id]
-
-        # Il faut suffisamment de points pour estimer une pente fiable
-        if len(sub) >= 6:
-            x = sub["TyreLife"].values
-            y = sub["LapTime_Sec"].values
-
-            # Régression linéaire sur le relais : y = a*x + b
-            a, b = np.polyfit(x, y, 1)
-            slopes.append(a)
-            valid_stints.append(stint_id)
-
-    if len(slopes) == 0:
-        print("Aucun relais valide pour l'analyse.")
-        return
-
-    slopes = np.array(slopes)
-
-    # --- Statistiques globales ---
-    print("\n--- Analyse de la dégradation par relais ---")
-    print(f"Nombre de relais analysés : {len(slopes)}")
-    print(f"Pente moyenne de dégradation : {slopes.mean():.4f} sec / tour")
-    print(f"Pente minimale : {slopes.min():.4f} sec / tour")
-    print(f"Pente maximale : {slopes.max():.4f} sec / tour")
-    print(f"Écart-type : {slopes.std():.4f} sec / tour")
-
-    # --- Graphique de quelques relais représentatifs ---
-    plt.figure(figsize=(10, 6))
-
-    # On affiche 5 relais bien répartis
-    sample_stints = valid_stints[::max(1, len(valid_stints)//5)][:5]
-
-    for stint_id in sample_stints:
-        sub = data[data["Stint"] == stint_id]
-
-        x = sub["TyreLife"].values
-        y = sub["LapTime_Sec"].values
-
-        a, b = np.polyfit(x, y, 1)
-        y_fit = a * x + b
-
-        plt.plot(x, y, 'o', alpha=0.4)
-        plt.plot(x, y_fit, label=f"Stint {stint_id} (pente={a:.3f})")
-
-    plt.xlabel("Usure du pneu (TyreLife)")
-    plt.ylabel("Temps au tour (sec)")
-
-    if circuit_name:
-        plt.title(f"Dégradation des pneus par relais – {circuit_name}")
-    else:
-        plt.title("Dégradation des pneus par relais")
-
-    plt.legend()
-    plt.grid(True, alpha=0.3)
-
-    rand = np.random.randint(0, 10000)
-    filename = f"outputs/degradation_par_relais_{rand}.png"
-    plt.tight_layout()
-    plt.savefig(filename)
-
-    print(f"Graphe par relais sauvegardé dans : {filename}")
-
-    return slopes
-
-
-def analyze_degradation_by_stint_and_compound(df, circuit_name=None):
-    """
-    Calcule la pente de dégradation (sec/tour) par relais,
-    séparée par type de pneu (Soft / Medium / Hard),
-    et génère des graphiques comparatifs.
-    """
-
-    import numpy as np
-    import matplotlib.pyplot as plt
-    import pandas as pd
-
-    data = df.copy()
-
-    if circuit_name is not None:
-        data = data[data["Circuit"] == circuit_name]
-
-    data = data.dropna(subset=["Stint", "TyreLife", "LapTime_Sec", "Compound"])
-
-    results = {
-        "SOFT": [],
-        "MEDIUM": [],
-        "HARD": []
-    }
-
-    # --- Calcul des pentes par relais ---
-    for stint_id in sorted(data["Stint"].unique()):
-        sub = data[data["Stint"] == stint_id]
-
-        if len(sub) >= 6:  # assez de points
-            x = sub["TyreLife"].values
-            y = sub["LapTime_Sec"].values
-            a, b = np.polyfit(x, y, 1)
-
-            compound = sub["Compound"].iloc[0]
-            if compound in results:
-                results[compound].append(a)
-
-    # --- Statistiques ---
-    print("\n--- Analyse de la dégradation par relais et par type de pneu ---")
-    for comp, slopes in results.items():
-        if len(slopes) > 0:
-            slopes = np.array(slopes)
-            print(f"\n{comp}")
-            print(f"  Nombre de relais : {len(slopes)}")
-            print(f"  Pente moyenne    : {slopes.mean():.4f} sec/tour")
-            print(f"  Pente min        : {slopes.min():.4f}")
-            print(f"  Pente max        : {slopes.max():.4f}")
-            print(f"  Écart-type       : {slopes.std():.4f}")
-            results[comp] = slopes
-        else:
-            print(f"\n{comp} : aucun relais valide")
-
-    # --- BOXPLOT COMPARATIF ---
-    plt.figure(figsize=(9, 6))
-
-    data_to_plot = []
-    labels = []
-
-    for comp in ["SOFT", "MEDIUM", "HARD"]:
-        if len(results[comp]) > 0:
-            data_to_plot.append(results[comp])
-            labels.append(comp)
-
-    plt.boxplot(data_to_plot, labels=labels, showfliers=True)
-    plt.ylabel("Pente de dégradation (sec / tour)")
-    if circuit_name:
-        plt.title(
-            f"Comparaison de la dégradation par type de pneu – {circuit_name}")
-    else:
-        plt.title("Comparaison de la dégradation par type de pneu")
-
-    plt.grid(True, alpha=0.3)
-
-    import numpy as np
-    rand = np.random.randint(0, 10000)
-    filename1 = f"outputs/pentes_par_compose_{rand}.png"
-    plt.tight_layout()
-    plt.savefig(filename1)
-
-    print(f"Boxplot sauvegardé : {filename1}")
-
-    # --- HISTOGRAMMES ---
-    plt.figure(figsize=(10, 6))
-
-    for comp in ["SOFT", "MEDIUM", "HARD"]:
-        if len(results[comp]) > 0:
-            plt.hist(results[comp], bins=12, alpha=0.6, label=comp)
-
-    plt.xlabel("Pente de dégradation (sec / tour)")
-    plt.ylabel("Nombre de relais")
-    if circuit_name:
-        plt.title(f"Distribution des pentes par type de pneu – {circuit_name}")
-    else:
-        plt.title("Distribution des pentes par type de pneu")
-
-    plt.legend()
-    plt.grid(True, alpha=0.3)
-
-    filename2 = f"outputs/histogramme_pentes_{rand}.png"
-    plt.tight_layout()
-    plt.savefig(filename2)
-
-    print(f"Histogramme sauvegardé : {filename2}")
-
-    return results
-
+custom_palette = ["#121F45", "#223971", "#6674A3", "#CC1E4A", "#FFC906"]
 
 COMPOUND_COLORS = {
     "SOFT": "red",
@@ -445,7 +20,7 @@ COMPOUND_COLORS = {
 }
 
 
-def plot_actual_strat_vs_predicted_strat(actual_strat, results, driver, model_name="RandomForest"):
+def plot_actual_strat_vs_predicted_strat(actual_strat, results, driver, circuit_name, model_name="RandomForest"):
     """
     Trace les stratégies pneus par tour pour chaque circuit.
     X = numéro de tour
@@ -503,7 +78,7 @@ def plot_actual_strat_vs_predicted_strat(actual_strat, results, driver, model_na
         plt.grid(True)
         plt.tight_layout()
 
-        filename = f"outputs/drivers/strat_Abu_Dhabi_2025_{model_name}_{driver}.png"
+        filename = f"outputs/drivers/strat_{circuit_name}_2025_{model_name}_{driver}.png"
         plt.savefig(filename)
         print(f"Graphique sauvegardé sous '{filename}'")
         # plt.show()
@@ -518,12 +93,12 @@ def plot_accuracy_comparison(average_accuracy_per_model):
 
     plt.figure(figsize=(10, 6))
     # Pass the custom palette with custom hex colors
-    custom_palette = ["#121F45", "#223971", "#6674A3", "#CC1E4A", "#FFC906"]
-    sns.barplot(x=models, y=avg_accuracies, palette=custom_palette)
+    sns.barplot(x=models, y=avg_accuracies,
+                hue=avg_accuracies, palette=custom_palette)
 
     plt.xlabel("Modèle")
-    plt.ylabel("Précision Moyenne")
-    plt.title("Comparaison des Précisions Moyennes par Modèle")
+    plt.ylabel("Précision moyenne")
+    plt.title("Comparaison des précisions moyennes par modèle")
     plt.ylim(0, 1)
     plt.grid(axis='y', alpha=0.3)
 
@@ -532,3 +107,89 @@ def plot_accuracy_comparison(average_accuracy_per_model):
     plt.tight_layout()
     plt.savefig(filename)
     print(f"Graphique de comparaison des précisions sauvegardé : {filename}")
+
+
+def plot_aggregated_feature_importance(importances, feature_names, title="Importance moyenne des features (Random Forest)"):
+    """
+    Affiche l'importance moyenne des variables sur l'ensemble des pilotes.
+    """
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    import numpy as np
+
+    # Création du DataFrame
+    df_imp = pd.DataFrame({
+        'Feature': feature_names,
+        'Importance': importances
+    }).sort_values('Importance', ascending=False)
+
+    plt.figure(figsize=(10, 6))
+    sns.barplot(x='Importance', y='Feature',
+                data=df_imp, hue='Feature', palette=custom_palette)
+
+    plt.title(title)
+    plt.xlabel("Poids Moyen (Importance)")
+    plt.ylabel("Variables")
+    plt.grid(axis='x', alpha=0.3)
+
+    # Affichage des valeurs
+    for index, value in enumerate(df_imp['Importance']):
+        plt.text(value, index, f'{value:.3f}', va='center', fontsize=9)
+
+    plt.tight_layout()
+
+    rand = np.random.randint(0, 10000)
+    filename = f"outputs/avg_feature_importance_{rand}.png"
+    plt.savefig(filename)
+    print(f"Graphique moyen sauvegardé : {filename}")
+
+
+def plot_accuracy_trend_by_data_size(trend_data):
+    """
+    Affiche l'évolution de la précision en fonction du nombre d'années d'entraînement.
+
+    trend_data est une liste de dictionnaires :
+    [
+        {'label': '2019', 'scores': {'RandomForest': 0.75, 'Logistic': 0.70}},
+        {'label': '2019-2020', 'scores': {'RandomForest': 0.78, 'Logistic': 0.72}},
+        ...
+    ]
+    """
+    import matplotlib.pyplot as plt
+    import pandas as pd
+    import seaborn as sns
+    import numpy as np
+
+    # Transformation des données pour Seaborn (Format Long)
+    plot_data = []
+    for entry in trend_data:
+        label = entry['label']
+        for model_name, score in entry['scores'].items():
+            plot_data.append({
+                'Données': label,
+                'Précision': score,
+                'Modèle': model_name
+            })
+
+    df_plot = pd.DataFrame(plot_data)
+
+    plt.figure(figsize=(12, 6))
+
+    # Trace les lignes avec des points
+    sns.lineplot(data=df_plot, x='Données',
+                 y='Précision', hue='Modèle', marker='o', linewidth=2.5)
+
+    plt.title(
+        "Impact du volume de données historiques sur la précision (Test: Abu Dhabi 2025)")
+    plt.ylabel("Précision moyenne (Accuracy)")
+    plt.xlabel("Années incluses dans l'entraînement")
+    plt.ylim(0, 1.05)  # On laisse un peu de marge
+    plt.grid(True, alpha=0.3)
+    plt.xticks(rotation=45)  # Rotation pour lire les années
+
+    rand = np.random.randint(0, 10000)
+    filename = f"outputs/learning_curve_data_size_{rand}.png"
+    plt.tight_layout()
+    plt.savefig(filename)
+    print(f"Graphique de tendance sauvegardé : {filename}")

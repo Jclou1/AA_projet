@@ -22,7 +22,7 @@ def train_all_models(X_train, y_train):
     }
 
     for name, model in models.items():
-        print(f"Entraînement de {name}...")
+        # print(f"Entraînement de {name}...")
         model.fit(X_train, y_train)
 
     return models

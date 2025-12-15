@@ -1,91 +1,186 @@
-from src.data_loader import load_multiple_races, load_race_data
+from src.data_loader import load_multiple_races, load_race_data, setup_cache
 from src.features import prepare_data
 from src.models import train_all_models, evaluate_all_models
-from src.visualization import plot_actual_strat_vs_predicted_strat, plot_accuracy_comparison
+from src.visualization import (
+    plot_actual_strat_vs_predicted_strat,
+    plot_accuracy_comparison,
+    plot_aggregated_feature_importance,
+    plot_accuracy_trend_by_data_size
+)
 from src.strat import parse_strategy
+import numpy as np
+import pandas as pd
+
+from fastf1 import logger
+logger.set_log_level("ERROR")
+
+setup_cache()
 
 
 def main():
-    print("F1 Tire Degradation Predictor")
+    print("=== 🏎️  F1 Tire Degradation Predictor ===")
+    print("=== Analyse Complète : Stratégies & Courbe d'Apprentissage ===\n")
 
-    # Listes des courses à analyser
-    # Bahrain est très abrasif (bon pour voir l'usure)
-    races_config = [
-        # (2019, 'Abu Dhabi'),
-        # (2020, 'Abu Dhabi'),
-        # (2021, 'Abu Dhabi'),
-        # (2022, 'Abu Dhabi'),
-        # (2023, 'Abu Dhabi'),
-        # (2024, 'Abu Dhabi'),
-        (2019, 'Qatar'),
-        (2020, 'Qatar'),
-        (2021, 'Qatar'),
-        (2022, 'Qatar'),
-        (2023, 'Qatar'),
-        (2024, 'Qatar'),
+    # --- 1. CONFIGURATION ---
+    # Liste des années historiques pour l'entraînement
+    # On ajoute les années progressivement pour voir l'impact du volume de données
+    full_races_config = [
+        (2019, 'Abu Dhabi'),
+        (2020, 'Abu Dhabi'),
+        (2021, 'Abu Dhabi'),
+        (2022, 'Abu Dhabi'),
+        (2023, 'Abu Dhabi'),
+        (2024, 'Abu Dhabi'),
     ]
 
-    drivers = ['VER', 'LEC', 'HAM', 'GAS', 'RUS', 'NOR']
+    target_drivers = ['VER', 'LEC', 'HAM', 'GAS', 'RUS', 'NOR']
+    test_year = 2025
+    test_gp = 'Abu Dhabi'
 
-    # Chargement des données
-    df = load_multiple_races(races_config)
-    if df.empty:
-        print("Aucune donnée chargée. Vérifiez votre connexion internet ou l'API.")
+    # --- 2. CHARGEMENT DU JEU DE TEST (Fixe) ---
+    # On charge 2025 une seule fois pour gagner du temps
+    print(f"📥 Chargement du jeu de test cible ({test_year} {test_gp})...")
+    df_test_full = load_race_data(test_year, test_gp)
+
+    if df_test_full.empty:
+        print("❌ Erreur : Impossible de charger le jeu de test.")
         return
 
-    average_accuracy_per_model = {}
-    # Préparation des features
-    for driver in drivers:
-        print(f"\n Préparation des données pour {driver}")
-        # Only keep data for the specific driver
-        X, y = prepare_data(df[df['Driver'] == driver])
+    # --- 3. INITIALISATION DES STOCKAGES ---
+    # Pour la courbe d'apprentissage (Learning Curve)
+    trend_results = []
 
-        # Train on all data
-        X_train, y_train = X, y
+    # Pour l'analyse finale (Bar charts & Feature Importance)
+    final_avg_accuracy = {}  # {Model: [acc_driver1, acc_driver2...]}
+    final_feature_importances = []
+    feature_names = None
 
-        # load Abu Dhabi 2025 for testing
-        df_test = load_race_data(2025, 'Abu Dhabi')
-        X_test, y_test = prepare_data(df_test[df_test['Driver'] == driver])
+    # --- 4. BOUCLE INCRÉMENTALE (Learning Curve Loop) ---
+    # On commence avec 1 année, puis 2, puis 3... jusqu'à tout le dataset.
 
-        actual_strat = parse_strategy(X_test, y_test)
+    for i in range(1, len(full_races_config) + 1):
+        # A. Définition du sous-ensemble d'entraînement
+        subset_config = full_races_config[:i]
 
-        # =============================
-        #  COMPARAISON MULTI-MODÈLES
-        # =============================
-        print("\n--- Comparaison de plusieurs modèles ---")
+        if i == 1:
+            years_label = str(subset_config[0][0])
+        else:
+            years_label = f"{subset_config[0][0]}-{subset_config[-1][0]}"
 
-        models = train_all_models(X_train, y_train)
-        results = evaluate_all_models(models, X_test, y_test)
+        # Est-ce la dernière itération (Full Data) ?
+        is_final_run = (i == len(full_races_config))
 
-        print("\nRésumé des performances :")
+        print(
+            f"\n🔄 [Itération {i}/{len(full_races_config)}] Entraînement sur : {years_label}")
 
-        for model in results['Model'].unique():
-            # Compute the average accuracy per model across drivers
-            if model not in average_accuracy_per_model:
-                average_accuracy_per_model[model] = []
+        # B. Chargement des données d'entraînement pour ce sous-ensemble
+        df_train_full = load_multiple_races(subset_config)
+        if df_train_full.empty:
+            continue
 
-            acc = results.loc[results['Model'] == model, 'Accuracy'].values[0]
-            f1 = results.loc[results['Model'] == model, 'F1_Score'].values[0]
+        # Stockage temporaire pour moyenner les scores des pilotes pour cette étape
+        current_step_accuracies = {}
 
-            average_accuracy_per_model[model].append(acc)
+        # --- 5. BOUCLE PAR PILOTE ---
+        for driver in target_drivers:
+            # Filtrage des données pour ce pilote
+            df_train = df_train_full[df_train_full['Driver'] == driver]
+            df_test = df_test_full[df_test_full['Driver'] == driver]
 
-            print(f"{model} : \n Accuracy = {acc:.2%}, \n"
-                  f"F1 Score = {f1:.4f}, \n"
-                  f"actual = {actual_strat}\n")
+            if df_train.empty or df_test.empty:
+                continue
 
-        # Visualisation des performances
-        plot_actual_strat_vs_predicted_strat(
-            actual_strat, results, driver, model_name="RandomForest")
+            # Préparation (X, y)
+            X_train, y_train = prepare_data(df_train)
+            X_test, y_test = prepare_data(df_test)
 
-        print("\nTerminé avec succès !")
+            # Entraînement des modèles
+            models = train_all_models(X_train, y_train)
 
-    print("\n=== Average Accuracy per Model across Drivers ===")
-    for model, accuracies in average_accuracy_per_model.items():
-        avg_acc = sum(accuracies) / len(accuracies)
-        print(f"{model} : Average Accuracy = {avg_acc:.2%}")
+            # Évaluation
+            results = evaluate_all_models(models, X_test, y_test)
 
-    # Plot the average accuracies per model
-    plot_accuracy_comparison(average_accuracy_per_model)
+            # Reconstruction de la stratégie (utile pour le final run)
+            actual_strat = parse_strategy(X_test, y_test)
+
+            # C. Collecte des scores pour la courbe d'apprentissage
+            for model_name in results['Model'].unique():
+                acc = results.loc[results['Model'] ==
+                                  model_name, 'Accuracy'].values[0]
+
+                if model_name not in current_step_accuracies:
+                    current_step_accuracies[model_name] = []
+                current_step_accuracies[model_name].append(acc)
+
+            # D. Actions Spécifiques pour le DERNIER tour (Full Data Analysis)
+            if is_final_run:
+                print(f"   👤 {driver} traité (Full Data).")
+
+                # 1. Sauvegarde pour Accuracy Bar Chart
+                for model_name in results['Model'].unique():
+                    acc = results.loc[results['Model'] ==
+                                      model_name, 'Accuracy'].values[0]
+                    if model_name not in final_avg_accuracy:
+                        final_avg_accuracy[model_name] = []
+                    final_avg_accuracy[model_name].append(acc)
+
+                # 2. Sauvegarde pour Feature Importance (Random Forest uniquement)
+                if 'RandomForest' in models:
+                    feature_names = X_train.columns.tolist()
+                    final_feature_importances.append(
+                        models['RandomForest'].feature_importances_)
+
+                    # 3. Génération du graphique de Stratégie Individuelle
+                    # On affiche explicitement la dernière course d'entraînement comme référence dans le titre
+                    last_train_gp = subset_config[-1][1]
+                    plot_actual_strat_vs_predicted_strat(
+                        actual_strat, results, driver, circuit_name=last_train_gp, model_name="RandomForest"
+                    )
+
+        # --- 6. CALCUL DE LA MOYENNE POUR L'ÉTAPE COURANTE ---
+        if current_step_accuracies:
+            # Moyenne de l'accuracy de tous les pilotes pour cette taille de dataset
+            step_avg_scores = {m: np.mean(
+                scores) for m, scores in current_step_accuracies.items()}
+
+            trend_results.append({
+                'label': years_label,
+                'scores': step_avg_scores
+            })
+
+            # Petit log pour suivre la progression
+            best_model_step = max(step_avg_scores, key=step_avg_scores.get)
+            print(
+                f"   📈 Moyenne globale ({years_label}) - {best_model_step}: {step_avg_scores[best_model_step]:.2%}")
+
+    # ==========================================
+    # --- 7. GÉNÉRATION DES GRAPHIQUES FINAUX ---
+    # ==========================================
+    print("\n\n=== 📊 Génération des Rapports Visuels ===")
+
+    # A. Courbe d'Apprentissage (Data Size Trend)
+    if trend_results:
+        print("1. Génération de la Courbe d'Apprentissage...")
+        plot_accuracy_trend_by_data_size(trend_results)
+
+    # B. Importance Moyenne des Features (Tous pilotes)
+    if final_feature_importances and feature_names:
+        print("2. Génération de l'Importance Moyenne des Features...")
+        avg_importances = np.mean(final_feature_importances, axis=0)
+        plot_aggregated_feature_importance(avg_importances, feature_names)
+
+    # C. Comparaison des Modèles (Bar Chart final)
+    if final_avg_accuracy:
+        print("3. Génération de la Comparaison des Modèles...")
+        # Affichage console des moyennes finales
+        print("\n--- Précision Moyenne Finale (Toutes années) ---")
+        for model, accuracies in final_avg_accuracy.items():
+            avg_acc = np.mean(accuracies)
+            print(f"{model:<20} : {avg_acc:.2%}")
+
+        plot_accuracy_comparison(final_avg_accuracy)
+
+    print("\n✅ Analyse terminée avec succès !")
 
 
 if __name__ == "__main__":

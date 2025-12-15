@@ -19,7 +19,7 @@ def clean_predictions(predictions, window_size=5):
     # mais pour des petites séries, ceci fonctionne bien :
     smooth_preds = series.rolling(window=window_size, center=True, min_periods=1).apply(
         lambda x: stats.mode(x, keepdims=False)[0]
-    ).fillna(method='bfill').fillna(method='ffill')
+    ).ffill().bfill()
 
     return smooth_preds.values.astype(int)
 
