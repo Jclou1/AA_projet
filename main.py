@@ -18,7 +18,7 @@ setup_cache()
 
 
 def main():
-    print("🏎️  F1 Tire Degradation Predictor")
+    print("F1 Tire Degradation Predictor")
     print("Analyse Complète : Stratégies & Courbe d'Apprentissage\n")
 
     # Liste des années historiques pour l'entraînement
@@ -37,7 +37,7 @@ def main():
     test_gp = 'Abu Dhabi'
 
     # On charge 2025 une seule fois pour gagner du temps
-    print(f"📥 Chargement du jeu de test cible ({test_year} {test_gp})...")
+    print(f"Chargement du jeu de test cible ({test_year} {test_gp})...")
     df_test_full = load_race_data(test_year, test_gp)
 
     if df_test_full.empty:
@@ -66,7 +66,7 @@ def main():
         is_final_run = (i == len(full_races_config))
 
         print(
-            f"\n🔄 [Itération {i}/{len(full_races_config)}] Entraînement sur : {years_label}")
+            f"\n[Itération {i}/{len(full_races_config)}] Entraînement sur : {years_label}")
 
         # Chargement des données d'entraînement pour ce sous-ensemble
         df_train_full = load_multiple_races(subset_config)
@@ -109,7 +109,7 @@ def main():
 
             # Actions Spécifiques pour la dernière itération
             if is_final_run:
-                print(f"   👤 {driver} traité (Full Data).")
+                print(f"{driver} traité (Full Data).")
 
                 # Sauvegarde pour Accuracy Bar Chart
                 for model_name in results['Model'].unique():
@@ -146,9 +146,9 @@ def main():
             # Petit log pour suivre la progression
             best_model_step = max(step_avg_scores, key=step_avg_scores.get)
             print(
-                f"   📈 Moyenne globale ({years_label}) - {best_model_step}: {step_avg_scores[best_model_step]:.2%}")
+                f"Moyenne globale ({years_label}) - {best_model_step}: {step_avg_scores[best_model_step]:.2%}")
 
-    print("\n\n=== 📊 Génération des Rapports Visuels ===")
+    print("\n\nGénération des Rapports Visuels")
 
     # Courbe d'apprentissage
     if trend_results:
@@ -165,14 +165,14 @@ def main():
     if final_avg_accuracy:
         print("3. Génération de la Comparaison des Modèles...")
         # Affichage console des moyennes finales
-        print("\n--- Précision Moyenne Finale (Toutes années) ---")
+        print("\nPrécision Moyenne Finale (Toutes années)")
         for model, accuracies in final_avg_accuracy.items():
             avg_acc = np.mean(accuracies)
             print(f"{model:<20} : {avg_acc:.2%}")
 
         plot_accuracy_comparison(final_avg_accuracy)
 
-    print("\n✅ Analyse terminée avec succès !")
+    print("\nAnalyse terminée avec succès !")
 
 
 if __name__ == "__main__":
