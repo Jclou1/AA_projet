@@ -17,7 +17,6 @@ def train_all_models(X_train, y_train):
         "RandomForest": RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1),
         "GradientBoosting": GradientBoostingClassifier(random_state=42),
         "KNN": KNeighborsClassifier(n_neighbors=5),
-        # SVC peut être lent sur de gros datasets, attention
         "SVC_RBF": SVC(kernel="rbf", C=1.0)
     }
 

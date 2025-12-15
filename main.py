@@ -18,10 +18,9 @@ setup_cache()
 
 
 def main():
-    print("=== 🏎️  F1 Tire Degradation Predictor ===")
-    print("=== Analyse Complète : Stratégies & Courbe d'Apprentissage ===\n")
+    print("🏎️  F1 Tire Degradation Predictor")
+    print("Analyse Complète : Stratégies & Courbe d'Apprentissage\n")
 
-    # --- 1. CONFIGURATION ---
     # Liste des années historiques pour l'entraînement
     # On ajoute les années progressivement pour voir l'impact du volume de données
     full_races_config = [
@@ -37,16 +36,14 @@ def main():
     test_year = 2025
     test_gp = 'Abu Dhabi'
 
-    # --- 2. CHARGEMENT DU JEU DE TEST (Fixe) ---
     # On charge 2025 une seule fois pour gagner du temps
     print(f"📥 Chargement du jeu de test cible ({test_year} {test_gp})...")
     df_test_full = load_race_data(test_year, test_gp)
 
     if df_test_full.empty:
-        print("❌ Erreur : Impossible de charger le jeu de test.")
+        print("Erreur : Impossible de charger le jeu de test.")
         return
 
-    # --- 3. INITIALISATION DES STOCKAGES ---
     # Pour la courbe d'apprentissage (Learning Curve)
     trend_results = []
 
@@ -55,11 +52,10 @@ def main():
     final_feature_importances = []
     feature_names = None
 
-    # --- 4. BOUCLE INCRÉMENTALE (Learning Curve Loop) ---
     # On commence avec 1 année, puis 2, puis 3... jusqu'à tout le dataset.
 
     for i in range(1, len(full_races_config) + 1):
-        # A. Définition du sous-ensemble d'entraînement
+        # Définition du sous-ensemble d'entraînement
         subset_config = full_races_config[:i]
 
         if i == 1:
@@ -67,13 +63,12 @@ def main():
         else:
             years_label = f"{subset_config[0][0]}-{subset_config[-1][0]}"
 
-        # Est-ce la dernière itération (Full Data) ?
         is_final_run = (i == len(full_races_config))
 
         print(
             f"\n🔄 [Itération {i}/{len(full_races_config)}] Entraînement sur : {years_label}")
 
-        # B. Chargement des données d'entraînement pour ce sous-ensemble
+        # Chargement des données d'entraînement pour ce sous-ensemble
         df_train_full = load_multiple_races(subset_config)
         if df_train_full.empty:
             continue
@@ -81,7 +76,7 @@ def main():
         # Stockage temporaire pour moyenner les scores des pilotes pour cette étape
         current_step_accuracies = {}
 
-        # --- 5. BOUCLE PAR PILOTE ---
+        # Boucle sur chaque pilote cible
         for driver in target_drivers:
             # Filtrage des données pour ce pilote
             df_train = df_train_full[df_train_full['Driver'] == driver]
@@ -103,7 +98,7 @@ def main():
             # Reconstruction de la stratégie (utile pour le final run)
             actual_strat = parse_strategy(X_test, y_test)
 
-            # C. Collecte des scores pour la courbe d'apprentissage
+            # Collecte des scores pour la courbe d'apprentissage
             for model_name in results['Model'].unique():
                 acc = results.loc[results['Model'] ==
                                   model_name, 'Accuracy'].values[0]
@@ -112,11 +107,11 @@ def main():
                     current_step_accuracies[model_name] = []
                 current_step_accuracies[model_name].append(acc)
 
-            # D. Actions Spécifiques pour le DERNIER tour (Full Data Analysis)
+            # Actions Spécifiques pour la dernière itération
             if is_final_run:
                 print(f"   👤 {driver} traité (Full Data).")
 
-                # 1. Sauvegarde pour Accuracy Bar Chart
+                # Sauvegarde pour Accuracy Bar Chart
                 for model_name in results['Model'].unique():
                     acc = results.loc[results['Model'] ==
                                       model_name, 'Accuracy'].values[0]
@@ -124,20 +119,20 @@ def main():
                         final_avg_accuracy[model_name] = []
                     final_avg_accuracy[model_name].append(acc)
 
-                # 2. Sauvegarde pour Feature Importance (Random Forest uniquement)
+                # Sauvegarde pour Feature Importance (Random Forest uniquement)
                 if 'RandomForest' in models:
                     feature_names = X_train.columns.tolist()
                     final_feature_importances.append(
                         models['RandomForest'].feature_importances_)
 
-                    # 3. Génération du graphique de Stratégie Individuelle
+                    # Génération du graphique de Stratégie Individuelle
                     # On affiche explicitement la dernière course d'entraînement comme référence dans le titre
                     last_train_gp = subset_config[-1][1]
                     plot_actual_strat_vs_predicted_strat(
                         actual_strat, results, driver, circuit_name=last_train_gp, model_name="RandomForest"
                     )
 
-        # --- 6. CALCUL DE LA MOYENNE POUR L'ÉTAPE COURANTE ---
+        # Calcul de la moyenne pour l'étape courante
         if current_step_accuracies:
             # Moyenne de l'accuracy de tous les pilotes pour cette taille de dataset
             step_avg_scores = {m: np.mean(
@@ -153,23 +148,20 @@ def main():
             print(
                 f"   📈 Moyenne globale ({years_label}) - {best_model_step}: {step_avg_scores[best_model_step]:.2%}")
 
-    # ==========================================
-    # --- 7. GÉNÉRATION DES GRAPHIQUES FINAUX ---
-    # ==========================================
     print("\n\n=== 📊 Génération des Rapports Visuels ===")
 
-    # A. Courbe d'Apprentissage (Data Size Trend)
+    # Courbe d'apprentissage
     if trend_results:
         print("1. Génération de la Courbe d'Apprentissage...")
         plot_accuracy_trend_by_data_size(trend_results)
 
-    # B. Importance Moyenne des Features (Tous pilotes)
+    # Importance Moyenne des Features (tous les pilotes)
     if final_feature_importances and feature_names:
         print("2. Génération de l'Importance Moyenne des Features...")
         avg_importances = np.mean(final_feature_importances, axis=0)
         plot_aggregated_feature_importance(avg_importances, feature_names)
 
-    # C. Comparaison des Modèles (Bar Chart final)
+    # Comparaison des modèles
     if final_avg_accuracy:
         print("3. Génération de la Comparaison des Modèles...")
         # Affichage console des moyennes finales

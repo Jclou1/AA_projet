@@ -45,19 +45,8 @@ def load_race_data(year, gp_identifier, session_type='R'):
         print(f"Erreur lors du chargement de la session : {e}")
         return pd.DataFrame()
 
-    # Extraction des tours (Laps)
+    # Extraction des tours
     laps = session.laps
-
-    # # Garder seulement les drapeaux verts (TrackStatus = '1')
-    # # Cela élimine les VSC, SC, et drapeaux jaunes qui faussent les temps.
-    # track_statuses = {'Green': 1,
-    #                     'Yellow': 2,
-    #                     'Unknown': 3,
-    #                     'Safety car': 4,
-    #                     'Red': 5,
-    #                     'Virtual Safety Car': 6,
-    #                     'VSC ending':7
-    #                     }
     laps = laps.pick_track_status('1234567', 'any')
 
     # Filtrage des composés de pneus
@@ -65,11 +54,10 @@ def load_race_data(year, gp_identifier, session_type='R'):
     laps = laps[laps['Compound'].isin(target_compounds)]
 
     # Enrichissement avec la météo
-    # FastF1 permet de lier la météo à chaque tour.
     weather_data = laps.get_weather_data()
     laps = laps.reset_index(drop=True)
 
-    # On ajoute les colonnes météo importantes au DataFrame des tours
+    # On retire les sessions avec pluie
     if not weather_data.empty:
         # On s'assure que les index correspondent
         weather_cols = ['AirTemp', 'TrackTemp', 'Rainfall']
@@ -78,7 +66,6 @@ def load_race_data(year, gp_identifier, session_type='R'):
             print("Session avec pluie détectée, les données seront ignorées.")
             return pd.DataFrame()
 
-        # Note: get_weather_data retourne un DF aligné avec les laps fournis
         weather_data = weather_data.reset_index(drop=True)
 
         for col in weather_cols:
@@ -86,7 +73,7 @@ def load_race_data(year, gp_identifier, session_type='R'):
                 laps[col] = weather_data[col]
 
     # Sélection et nettoyage des colonnes finales
-    # Conversion du temps au tour en secondes (float) pour le modèle ML
+    # Conversion du temps au tour en secondes pour le modèle ML
     laps['LapTime_Sec'] = laps['LapTime'].dt.total_seconds()
 
     cols_to_keep = [
@@ -108,6 +95,7 @@ def load_race_data(year, gp_identifier, session_type='R'):
     # Vérification que toutes les colonnes existent avant de filtrer
     existing_cols = [c for c in cols_to_keep if c in laps.columns]
     df_clean = laps[existing_cols].copy()
+
     # add colum for total laps in the session
     df_clean['TotalLaps'] = session.total_laps
 
@@ -148,8 +136,6 @@ def load_multiple_races(races_config):
     return pd.concat(all_data, ignore_index=True)
 
 
-# ---------------------------------------------------------
-# Bloc de test (s'exécute seulement si on lance le fichier directement)
 if __name__ == "__main__":
     # Test simple sur le GP de Bahreïn 2024
     setup_cache()

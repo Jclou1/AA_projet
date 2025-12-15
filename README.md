@@ -1,105 +1,107 @@
-# Projet AA - Analyse des données des pneus de Formule 1 2024
-
-# 🏎️ Prédicteur de dégradation des pneus en F1
+# 🏎️ F1 Race Strategy Predictor
 
 **Cours :** Introduction à l'apprentissage automatique (GIF-4101 / GIF-7005)
-
 **Université :** Université Laval
+**Session :** Automne 2025
 
-Ce projet vise à appliquer des techniques d'apprentissage automatique aux données de télémétrie de Formule 1 afin de modéliser et prédire la **dégradation des pneus**. L'objectif est de fournir un outil d'aide à la décision stratégique capable d'identifier le moment optimal pour un arrêt aux stands.
+Ce projet vise à appliquer des techniques d'apprentissage automatique supervisé pour modéliser et prédire les **stratégies de course** en Formule 1. L'objectif est de développer un "Assistant Stratège" capable d'anticiper les choix de pneumatiques (_Soft, Medium, Hard_) et les fenêtres d'arrêt aux stands à partir de données historiques.
 
-## 📋 Table des matières
+## 🎯 Contexte et Objectifs
 
-1.  [Contexte et Problématique](#🧐-contexte-et-problématique)
-2.  [Objectifs du projet](#🎯-objectifs-du-projet)
-3.  [Source des données](#💾-source-des-données)
-4.  [Méthodologie et Pipeline ML](#⚙️-méthodologie-et-pipeline-ml)
-5.  [Installation et Utilisation](#🚀-installation-et-utilisation)
+Dans la F1 moderne, la stratégie est aussi déterminante que la performance pure. Ce projet répond à la problématique suivante : **Comment prédire la séquence optimale de pneumatiques pour une course future en se basant sur l'historique ?**
 
-## 🧐 Contexte et Problématique
+Nous avons développé un pipeline complet qui :
 
-Dans la Formule 1 moderne, les écuries génèrent des quantités massives de données télémétriques. Cependant, ces données brutes sont complexes, peu documentées et difficiles à corréler.
+1.  Extrait les données de télémétrie via l'API **FastF1**.
+2.  Entraîne des **classificateurs** (Random Forest, Gradient Boosting, etc.) pour prédire le composé de pneu idéal tour par tour.
+3.  Reconstitue des stratégies de course cohérentes (séquences de relais) via des algorithmes de lissage.
+4.  Analyse l'impact du volume de données sur la performance (Courbe d'apprentissage).
 
-L'un des enjeux stratégiques majeurs est la gestion des pneus. Contrairement au niveau de carburant, l'usure des pneus n'est pas mesurable directement par un capteur. Elle doit être inférée à partir de la performance en piste.
+## 📂 Structure du Projet
 
-**Le défi de Machine Learning :**
-Isoler l'effet de la dégradation des pneus sur le temps au tour parmi de multiples facteurs confondants :
+```text
+projet_f1/
+├── data/                  # Cache local des données FastF1 (créé automatiquement)
+├── outputs/               # Graphiques générés (Stratégies, Accuracy, Features)
+├── src/
+│   ├── __init__.py
+[cite_start]│   ├── data_loader.py     # Extraction et nettoyage (Filtre SC/VSC, Pluie) [cite: 5]
+[cite_start]│   ├── features.py        # Ingénierie des features (TyreLife, TrackTemp...) [cite: 4]
+[cite_start]│   ├── models.py          # Entraînement et évaluation (RF, LogReg, GBM...) [cite: 6]
+[cite_start]│   ├── strat.py           # Reconstruction des stratégies (Parsing & Lissage) [cite: 7]
+[cite_start]│   └── visualization.py   # Génération des graphiques d'analyse [cite: 3]
+[cite_start]├── main.py                # Script principal d'exécution [cite: 8]
+[cite_start]├── gp_finder.py           # Utilitaire pour lister les GP disponibles [cite: 9]
+[cite_start]├── requirements.txt       # Dépendances Python [cite: 10]
+└── README.md              # Documentation du projet
+```
 
-- **Masse de carburant :** La voiture s'allège à un taux \~1.7kg/tour, ce qui améliore naturellement les temps au tour.
-- **Gomme :** Les pneus tendres (Soft) sont rapides mais s'usent vite; les durs (Hard) sont lents mais durables.
-- **Conditions de piste :** Évolution de la température et du dépôt de gomme ("track evolution").
-
-Notre modèle cherche à dissocier ces variables pour prédire le "cliff" (chute brutale de performance) des pneus.
-
-## 🎯 Objectifs du projet
-
-Le projet se concentre sur trois axes principaux :
-
-1.  **Ingénierie des données :** Transformer les flux bruts de l'API FastF1 en un jeu de données structuré pour le ML (nettoyage des tours sous Safety Car, filtrage des erreurs de pilotage).
-2.  **Modélisation prédictive :** Entraîner un modèle de régression (Random Forest / MLP) pour estimer le temps au tour attendu ($Y$) en fonction de l'âge du pneu, du composé et du contexte de course ($X$).
-3.  **Visualisation stratégique :** Générer des courbes de dégradation comparatives (ex: Soft vs Hard) pour visualiser les points de croisement stratégiques.
-
-## 💾 Source des données
-
-Les données proviennent de la librairie open-source **FastF1**.
-
-- **Origine :** Flux de télémétrie officiels de la F1 (Live Timing).
-- **Fiabilité :** Données maintenues par la communauté, couvrant les saisons 2018 à aujourd'hui.
-- **Contenu :** Télémétrie par tour, météo, type de pneus, position GPS.
-
-## ⚙️ Méthodologie et Pipeline ML
-
-Nous utilisons Python et l'écosystème Scikit-Learn/Pandas. Notre pipeline suit les étapes suivantes :
-
-### 1\. Collecte et Nettoyage (`src/data_loader.py`)
-
-- Extraction des sessions de course via l'API.
-- **Filtrage agressif :** Suppression des tours non représentatifs (tours de sortie/entrée des stands, drapeaux jaunes, Safety Car, pluie).
-- Seuls les tours "lancés" (Flying Laps) sont conservés.
-
-### 2\. Feature Engineering (`src/features.py`)
-
-Création des variables explicatives pour le modèle :
-
-- `TyreLife` : Âge du pneu en tours.
-- `Compound` : Encodage (One-Hot ou Ordinal) du type de gomme (Soft/Medium/Hard).
-- `FuelProxy` : Utilisation du numéro de tour (`LapNumber`) comme proxy inversé de la charge carburant.
-- `TrackTemp` : Température de la piste (impacte la dégradation thermique).
-
-### 3\. Modélisation (`src/models.py`)
-
-Nous comparons plusieurs approches pour capturer la non-linéarité de l'usure :
-
-- **Baseline :** Régression Linéaire.
-- **Modèle principal :** Random Forest Regressor (capable de capturer les seuils de dégradation non-linéaires).
-
-### 4\. Évaluation
-
-- Métrique principale : RMSE (Root Mean Square Error) sur le temps au tour.
-- Validation croisée sur des Grands Prix non vus lors de l'entraînement pour tester la généralisation.
-
-## 🚀 Installation et Utilisation
+## 🚀 Installation
 
 1.  **Cloner le dépôt :**
 
     ```bash
-    git clone git@github.com:Jclou1/AA_projet.git
-    cd AA_projet
+    git clone <votre-repo-url>
+    cd projet_f1
     ```
 
 2.  **Installer les dépendances :**
-    Il est recommandé d'utiliser un environnement virtuel.
+    Il est recommandé d'utiliser un environnement virtuel (venv ou conda).
 
     ```bash
-    python -m venv venv
-    source venv/bin/activate  # Sur Windows : venv\Scripts\activate
     pip install -r requirements.txt
     ```
 
-3.  **Lancer l'analyse :**
+    _Principales librairies :_ `fastf1`, `scikit-learn`, `pandas`, `numpy`, `matplotlib`, `seaborn`.
 
-    ```bash
-    python main.py
-    ```
+## ▶️ Utilisation
 
-    _Le script téléchargera automatiquement les données nécessaires via FastF1 (mise en cache automatique)._
+Pour lancer l'analyse complète (entraînement, courbes d'apprentissage et génération des graphiques), exécutez simplement le script principal :
+
+```bash
+python main.py
+```
+
+**Ce que fait le script :**
+
+1.  Charge progressivement les données historiques (ex: 2019, puis 2019-2020, etc.) pour analyser la courbe d'apprentissage.
+2.  Entraîne plusieurs modèles sur les pilotes cibles (VER, LEC, HAM, etc.).
+3.  Teste la performance sur une course cible (ex: Abu Dhabi 2025).
+4.  Génère et sauvegarde les graphiques dans le dossier `outputs/`.
+
+## ⚙️ Méthodologie
+
+### 1\. Prétraitement des Données (`src/data_loader.py`)
+
+- Utilisation de `FastF1` pour récupérer la télémétrie.
+- **Filtrage :** Exclusion des sessions sous la pluie et nettoyage des tours non représentatifs (tours de sortie/entrée, Safety Car).
+
+### 2\. Feature Engineering (`src/features.py`)
+
+Transformation des données brutes en variables prédictives :
+
+- **État Course :** `LapNumber`, `TrackStatus` (SC/VSC).
+- **Physique Pneu :** `TyreLife` (Âge du train de pneus).
+- **Conditions :** `TrackTemp`, `AirTemp`.
+- **Contexte :** `Position`, `Team`.
+
+### 3\. Modélisation (`src/models.py`)
+
+Comparaison de plusieurs algorithmes de classification :
+
+- **Random Forest Classifier** (Modèle principal, robuste).
+- Logistic Regression (Baseline).
+- Gradient Boosting & KNN.
+
+### 4\. Reconstruction de Stratégie (`src/strat.py`)
+
+Conversion des prédictions tour par tour en une stratégie lisible (ex: `SOFT (15 tours) -> HARD (20 tours)`). Implémentation d'une logique de lissage pour éviter les changements de pneus irréalistes sur un seul tour.
+
+## 📊 Résultats et Visualisations
+
+Les résultats sont sauvegardés automatiquement dans le dossier `outputs/`. Les analyses incluent :
+
+1.  **Comparaison Réel vs Prédit :** Graphique montrant la stratégie exécutée par le pilote vs celle prédite par l'IA.
+2.  **Courbe d'Apprentissage (Learning Curve) :** Analyse de l'évolution de la précision (Accuracy) en fonction du nombre d'années d'historique incluses.
+3.  **Comparaison des Modèles :** Bar chart comparant l'Accuracy et le F1-Score des différents algorithmes.
+4.  **Importance des Features :** Classement des variables (ex: `TyreLife`, `LapNumber`) ayant le plus d'impact sur la décision du modèle.

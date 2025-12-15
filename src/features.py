@@ -14,13 +14,6 @@ def prepare_data(df):
     df = df.copy()
     df['Compound_Encoded'] = df['Compound'].map(compound_map)
 
-    # Encodage du circuit (si plusieurs circuits)
-    # On utilise LabelEncoder pour transformer les noms de circuits en ID
-    # circuit = LabelEncoder()
-    # df['Circuit_ID'] = circuit.fit_transform(df['Circuit'])
-    # circuits_map = {index: label for index,
-    #                 label in zip(df['Circuit_ID'], df['Circuit'])}
-
     team = LabelEncoder()
     df['Team_Encoded'] = team.fit_transform(df['Team'])
 
@@ -60,5 +53,3 @@ def split_data(X, y, group_col):
     train_idx, test_idx = next(splitter.split(X, y, groups))
 
     return X.iloc[train_idx], X.iloc[test_idx], y.iloc[train_idx], y.iloc[test_idx]
-
-

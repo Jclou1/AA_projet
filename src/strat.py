@@ -31,16 +31,14 @@ def parse_strategy(X, compound, clean=True):
     """
     results = {}
 
-    # 1. Récupération des prédictions brutes
+    # Récupération des prédictions brutes
     raw_compounds = compound.values.astype(int)
 
-    # 2. NETTOYAGE : On lisse les prédictions pour éviter les arrêts inutiles
+    # On lisse les prédictions pour éviter les arrêts inutiles
     if clean:
         compounds = clean_predictions(raw_compounds, window_size=5)
     else:
         compounds = raw_compounds
-
-    # (Le reste de votre logique reste identique, mais on utilise 'compounds' nettoyé)
 
     # Pour le test actuel (Abu Dhabi 2025)
     race = "Abu Dhabi"
