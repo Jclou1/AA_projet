@@ -32,14 +32,12 @@ def plot_actual_strat_vs_predicted_strat(actual_strat, results, driver, circuit_
         results (pd.DataFrame): DataFrame avec colonnes 'Model' et 'Strat'
         model_name (str): modèle à afficher
     """
-    # Récupérer la stratégie prédite pour le modèle
     predicted_strat = results.loc[results['Model']
                                   == model_name, 'Strat'].values[0]
 
     for circuit in actual_strat.keys():
         plt.figure(figsize=(12, 6))
 
-        # --- Réel ---
         actual_list = actual_strat[circuit]
         actual_laps = []
         actual_compounds = []
@@ -51,7 +49,6 @@ def plot_actual_strat_vs_predicted_strat(actual_strat, results, driver, circuit_
             actual_compounds.extend([y_val]*length)
             lap_counter += length
 
-        # --- Prédit ---
         predicted_list = predicted_strat.get(circuit, [])
         pred_laps = []
         pred_compounds = []
@@ -63,7 +60,6 @@ def plot_actual_strat_vs_predicted_strat(actual_strat, results, driver, circuit_
             pred_compounds.extend([y_val]*length)
             lap_counter += length
 
-        # Scatter plot
         plt.scatter(actual_laps, actual_compounds,
                     color='blue', label='Réel', alpha=0.7)
         plt.scatter(pred_laps, pred_compounds, color='orange',
@@ -81,7 +77,6 @@ def plot_actual_strat_vs_predicted_strat(actual_strat, results, driver, circuit_
         filename = f"outputs/drivers/strat_{circuit_name}_2025_{model_name}_{driver}.png"
         plt.savefig(filename)
         print(f"Graphique sauvegardé sous '{filename}'")
-        # plt.show()
 
 
 def plot_accuracy_comparison(average_accuracy_per_model):
@@ -113,12 +108,6 @@ def plot_aggregated_feature_importance(importances, feature_names, title="Import
     """
     Affiche l'importance moyenne des variables sur l'ensemble des pilotes.
     """
-    import pandas as pd
-    import matplotlib.pyplot as plt
-    import seaborn as sns
-    import numpy as np
-
-    # Création du DataFrame
     df_imp = pd.DataFrame({
         'Feature': feature_names,
         'Importance': importances
@@ -133,7 +122,6 @@ def plot_aggregated_feature_importance(importances, feature_names, title="Import
     plt.ylabel("Variables")
     plt.grid(axis='x', alpha=0.3)
 
-    # Affichage des valeurs
     for index, value in enumerate(df_imp['Importance']):
         plt.text(value, index, f'{value:.3f}', va='center', fontsize=9)
 
@@ -156,12 +144,6 @@ def plot_accuracy_trend_by_data_size(trend_data):
         ...
     ]
     """
-    import matplotlib.pyplot as plt
-    import pandas as pd
-    import seaborn as sns
-    import numpy as np
-
-    # Transformation des données pour Seaborn (Format Long)
     plot_data = []
     for entry in trend_data:
         label = entry['label']
@@ -176,7 +158,6 @@ def plot_accuracy_trend_by_data_size(trend_data):
 
     plt.figure(figsize=(12, 6))
 
-    # Trace les lignes avec des points
     sns.lineplot(data=df_plot, x='Données',
                  y='Précision', hue='Modèle', marker='o', linewidth=2.5)
 
@@ -184,9 +165,9 @@ def plot_accuracy_trend_by_data_size(trend_data):
         "Impact du volume de données historiques sur la précision (Test: Abu Dhabi 2025)")
     plt.ylabel("Précision moyenne (Accuracy)")
     plt.xlabel("Années incluses dans l'entraînement")
-    plt.ylim(0, 1.05)  # On laisse un peu de marge
+    plt.ylim(0, 1.05)
     plt.grid(True, alpha=0.3)
-    plt.xticks(rotation=45)  # Rotation pour lire les années
+    plt.xticks(rotation=45)
 
     rand = np.random.randint(0, 10000)
     filename = f"outputs/learning_curve_data_size_{rand}.png"
